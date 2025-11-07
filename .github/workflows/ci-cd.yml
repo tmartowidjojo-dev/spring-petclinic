@@ -3,8 +3,6 @@ name: Spring Petclinic CI/CD (Java 25)
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
   build-and-test:
@@ -12,15 +10,18 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Java 25 container
-        run: |
-          docker pull eclipse-temurin:25-jdk
-          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace eclipse-temurin:25-jdk \
-            bash -c "java -version && mvn clean install -DskipTests=false"
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'  # or '17' for better compatibility
+          distribution: 'temurin'
 
-      - name: Run tests
-        run: |
-          docker run --rm -v ${{ github.workspace }}:/workspace -w /workspace eclipse-temurin:25-jdk \
-            bash -c "mvn test" 
+      - name: Set up Maven
+        uses: stCarolas/setup-maven@v4
+        with:
+          maven-version: '3.9.9'
+
+      - name: Build and test
+        run: mvn clean verify

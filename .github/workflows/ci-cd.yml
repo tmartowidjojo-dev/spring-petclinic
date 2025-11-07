@@ -15,7 +15,7 @@ jobs:
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: '21'  # or '17' for better compatibility
+          java-version: '25'  # or '17' for better compatibility
           distribution: 'temurin'
 
       - name: Set up Maven

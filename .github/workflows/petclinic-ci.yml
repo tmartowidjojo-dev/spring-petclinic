@@ -106,10 +106,10 @@ jobs:
           K6_TOTAL=$(jq '.metrics.http_reqs.count // 0' k6-results.json || echo 0)
           K6_FAILED=$(jq '.metrics.checks.fails // 0' k6-results.json || echo 0)
           
-          # Let op: De buitenste haakjes zijn verwijderd in de jq-filter.
-          K6_AVG=$(jq '(.metrics.http_req_duration.avg // 0) * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-          K6_MIN=$(jq '(.metrics.http_req_duration.min // 0) * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-          K6_MAX=$(jq '(.metrics.http_req_duration.max // 0) * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+          # Dit is de definitieve correctie: geen haakjes meer in de jq filter.
+          K6_AVG=$(jq '.metrics.http_req_duration.avg // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+          K6_MIN=$(jq '.metrics.http_req_duration.min // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+          K6_MAX=$(jq '.metrics.http_req_duration.max // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
 
           # --- Print table ---
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" Tool Total Failed Avg(ms) Min(ms) Max(ms)

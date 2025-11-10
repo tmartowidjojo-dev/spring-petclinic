@@ -8,31 +8,31 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      # 1️ Checkout code
+      # 1️ code uitchecken
       - name: Checkout code
         uses: actions/checkout@v4
         
-      # 2️ Set up Java 25
+      # 2️ java 25 instellen
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'
           
-      # 3️ Set up Maven
+      # 3️ maven instellen
       - name: Set up Maven
         uses: stCarolas/setup-maven@v4
         with:
           maven-version: '3.9.9'
           
-      # 4️ Build and run unit/integration tests
+      # 4️ builden en unit/integratietests uitvoeren
       - name: Build and test
         run: mvn clean verify
         
-      # 5️ Start Spring Petclinic in the background
+      # 5️ spring petclinic opstarten op de achtergrond
       - name: Start Spring Petclinic
         run: |
-          # Find the built JAR file, assume it's the only one
+          # vind het gebouwde jar-bestand, ga ervan uit dat het de enige is
           APP_JAR=$(find target -name "*.jar" -type f | head -n 1)
           
           if [ -z "$APP_JAR" ]; then
@@ -41,13 +41,13 @@ jobs:
           fi
           
           echo "Starting Spring Petclinic: $APP_JAR"
-          # Start app, redirecting stdout/stderr
+          # start app, omleiden van stdout/stderr
           nohup java -jar "$APP_JAR" > app.log 2>&1 &
           echo $! > spring-petclinic.pid
           
-          # --- IMPROVED READINESS CHECK (60 seconden timeout) ---
+          # --- verbeterde readiness check (60 seconden timeout) ---
           echo "Waiting for Spring Petclinic to be fully ready on http://localhost:8080/owners"
-          MAX_RETRIES=12  # Wait for up to 60 seconds (12 * 5s)
+          MAX_RETRIES=12  # wacht maximaal 60 seconden (12 * 5s)
           RETRY_COUNT=0
           
           until curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/owners | grep -q '200'; do
@@ -64,54 +64,55 @@ jobs:
           
           echo "Spring Petclinic is fully up and functional!"
           
-      # 6️ Install Performance Tools (FIXED: Voegt JMeter toe aan PATH en ENV)
+      # 6️ performance tools installeren (FIX: JMeter pad opslaan)
       - name: Install Performance Tools (JMeter, k6, jq)
         run: |
-          # Installeer basis tools
+          # installeer basis tools
           sudo apt-get update
           sudo apt-get install -y curl unzip jq
           
-          # --- JMeter 5.6.3 INSTALLATIE ---
+          # --- jmeter 5.6.3 installatie ---
           JMETER_VERSION="5.6.3"
           JMETER_DIR="apache-jmeter-$JMETER_VERSION"
           echo "Downloading Apache JMeter $JMETER_VERSION..."
           curl -sS -L "https://archive.apache.org/dist/jmeter/binaries/$JMETER_DIR.zip" -o jmeter.zip
           unzip -q jmeter.zip
           
-          #  FIX 1: Voeg de JMeter 'bin' directory toe aan het JOB's PATH 
-          echo "$PWD/$JMETER_DIR/bin" >> $GITHUB_PATH
-          
-          #  FIX 2: Exporteer het absolute pad naar een ENV-variabele voor expliciete aanroepen 
+          #  FIX 1: Exporteer het absolute pad naar een ENV variabele. 
+      
           echo "JMETER_BIN_PATH=$PWD/$JMETER_DIR/bin" >> $GITHUB_ENV
           
-          # --- k6 INSTALLATIE ---
-          # Installeer k6
+          # FIX 2: Voeg het pad OOK toe aan $GITHUB_PATH voor compatibiliteit (voor jmeter --version check)
+          echo "$PWD/$JMETER_DIR/bin" >> $GITHUB_PATH
+
+          
+          # --- k6 installatie ---
+          # installeer k6
           curl -fsSL https://dl.k6.io/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list > /dev/null
           sudo apt-get update
           sudo apt-get install -y k6
           
-          # Controleer de versies
+          # controleer de versies
           jmeter --version
           k6 version
           jq --version
           
-      # 7️ Run Tests and Extract Metrics (Nu met Explicit Path en Debugging)
+      # 7️ tests uitvoeren en statistieken extraheren (NU MET EXPLICITE AANROEP)
       - name: Run Tests and Extract Metrics
         id: performance_test
         run: |
           # --- DEBUGGING: Controleer de environment variabelen ---
-          echo "DEBUG: Huidig PATH (moet JMeter pad bevatten): $PATH"
-          echo "DEBUG: JMeter Explicit Path (van GITHUB_ENV): $JMETER_BIN_PATH"
+          echo "DEBUG: JMeter Bin Path: $JMETER_BIN_PATH"
           echo "========================================================="
           
           # Initialiseer alle variabelen als 0
           JM_TOTAL=0; JM_FAILED=0; JM_AVG=0; JM_MIN=0; JM_MAX=0
           K6_TOTAL=0; K6_FAILED=0; K6_AVG=0; K6_MIN=0; K6_MAX=0
           
-          # --- RUN JMeter TEST ---
+          # --- JMeter test uitvoeren ---
           echo "=== Running JMeter Test ==="
-          # Gebruik de expliciete pad-variabele voor gegarandeerd succes
+          # Gebruik de expliciete pad-variabele om de "command not found" fout te omzeilen
           "$JMETER_BIN_PATH/jmeter" -n -t performance-tests/petclinic-jmeter-test.jmx -l jmeter-results.jtl -j jmeter.log -LINFO 
           
           JMET_EXIT_CODE=$?
@@ -130,7 +131,7 @@ jobs:
                 
                 JM_TOTAL=$(grep -c '<httpSample' jmeter-results.jtl)
                 JM_FAILED=$JM_ERRORS
-                # Berekeningen voor AVG, MIN, MAX zijn OK.
+                # berekeningen voor avg, min, max zijn ok.
                 JM_AVG=$(echo "$JMETER_TIMES" | awk '{sum+=$1; count++} END {print count ? int(sum/count) : 0}')
                 JM_MIN=$(echo "$JMETER_TIMES" | sort -n | head -1 || echo 0)
                 JM_MAX=$(echo "$JMETER_TIMES" | sort -n | tail -1 || echo 0)
@@ -140,13 +141,13 @@ jobs:
             fi
           fi
           
-          # --- RUN k6 TEST ---
+          # --- k6 test uitvoeren ---
           echo "=== Running k6 Test ==="
           k6 run performance-tests/petclinic-load-test.js --out json=k6-results.json
           
           if [ -f "k6-results.json" ]; then
             echo "DEBUG: k6 results file found. Starting parsing."
-            # Berekeningen voor k6 zijn OK.
+            # berekeningen voor k6 zijn ok.
             K6_TOTAL=$(jq '.metrics.http_reqs.count // 0' k6-results.json || echo 0)
             K6_FAILED=$(jq '.metrics.checks.fails.count // 0' k6-results.json || echo 0)
             K6_AVG=$(jq '.metrics.http_req_duration.avg // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
@@ -154,7 +155,7 @@ jobs:
             K6_MAX=$(jq '.metrics.http_req_duration.max // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
           fi
           
-          # --- EXPORT METRICS (CRUCIALE STAP VOOR HET OPLOSSEN VAN HET '0' PROBLEEM) ---
+          # --- exporteer statistieken (cruciale stap voor het oplossen van het '0' probleem) ---
           echo "JM_TOTAL=$JM_TOTAL" >> $GITHUB_ENV
           echo "JM_FAILED=$JM_FAILED" >> $GITHUB_ENV
           echo "JM_AVG=$JM_AVG" >> $GITHUB_ENV
@@ -167,7 +168,7 @@ jobs:
           echo "K6_MAX=$K6_MAX" >> $GITHUB_ENV
           echo "DEBUG: Metrics exported to GITHUB_ENV."
           
-      # 8️ Print Performance Comparison (Leest uit GITHUB_ENV)
+      # 8️ prestatievergelijking afdrukken (leest uit github_env)
       - name: Print Performance Comparison
         run: |
           echo "=== Performance Comparison ==="
@@ -175,7 +176,7 @@ jobs:
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" JMeter $JM_TOTAL $JM_FAILED $JM_AVG $JM_MIN $JM_MAX
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" k6 $K6_TOTAL $K6_FAILED $K6_AVG $K6_MIN $K6_MAX
           
-      # 9️ Upload performance artifacts (jmeter.log toegevoegd)
+      # 9️ performance artifacts uploaden (jmeter.log toegevoegd)
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -186,7 +187,7 @@ jobs:
             app.log
             jmeter.log
             
-      # 10 Stop Spring Petclinic (Runs even if previous steps fail)
+      # 10 spring petclinic stoppen (wordt altijd uitgevoerd, zelfs bij fouten)
       - name: Stop Spring Petclinic
         if: always()
         run: |

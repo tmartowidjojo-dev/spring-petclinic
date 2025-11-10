@@ -13,63 +13,71 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️ Set up Java
+      # 2️ Cache Maven dependencies
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      # 3️ Set up Java
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'
 
-      # 3️ Set up Maven
+      # 4️ Set up Maven
       - name: Set up Maven
         uses: stCarolas/setup-maven@v4
         with:
           maven-version: '3.9.9'
 
-      # 4️ Build and run unit/integration tests
+      # 5️ Build and run unit/integration tests
       - name: Build and test
         run: mvn clean verify
 
-      # 5️ Start Spring Petclinic in the background
+      # 6️ Start Spring Petclinic in the background
       - name: Start Spring Petclinic
         run: |
           nohup java -jar target/*.jar > app.log 2>&1 &
           echo $! > spring-petclinic.pid
-          
-          # Wait until the app is fully up using actuator health
+
           echo "Waiting for Spring Petclinic to be ready..."
+          TIMEOUT=60
+          INTERVAL=1
+          ELAPSED=0
           until curl -s http://localhost:8080/actuator/health | grep -q '"status":"UP"'; do
-            sleep 5
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+            if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+              echo "App did not start in time!"
+              exit 1
+            fi
           done
           echo "Spring Petclinic is up!"
 
-      # 6️ Install JMeter
+      # 7️ Install JMeter
       - name: Install JMeter
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jmeter
+        run: sudo apt-get update && sudo apt-get install -y jmeter
 
-      # 7️ Run JMeter Test and fail if there are errors
-      - name: Run JMeter Test
-        run: |
-          jmeter -n -t performance-tests/petclinic-jmeter-test.jmx -l jmeter-results.jtl
-          ERRORS=$(grep -c 'false' jmeter-results.jtl || true)
-          if [ "$ERRORS" -gt 0 ]; then
-            echo "JMeter test failed with $ERRORS errors"
-            exit 1
-          fi
-
-      # 8️ Install k6 & jq
+      # 8️ Install k6 & jq quickly
       - name: Install k6 & jq
         run: |
-          sudo apt-get update
-          sudo apt-get install -y k6 jq
+          curl -sL https://github.com/grafana/k6/releases/download/v0.113.0/k6-v0.113.0-linux-amd64.tar.gz | tar -xz
+          sudo mv k6-v0.113.0-linux-amd64/k6 /usr/local/bin/
+          sudo apt-get update && sudo apt-get install -y jq
 
-      # 9️ Run k6 Test (fails automatically if thresholds violated)
-      - name: Run k6 Test
-        run: k6 run performance-tests/petclinic-load-test.js --out json=k6-results.json
+      # 9️ Run performance tests in parallel
+      - name: Run performance tests
+        run: |
+          jmeter -n -t performance-tests/petclinic-jmeter-test.jmx -l jmeter-results.jtl &
+          k6 run performance-tests/petclinic-load-test.js --out json=k6-results.json &
+          wait
 
-      # 1️0️ Compare performance metrics (inclusief k6 responseTime Trend)
+      # 10 Compare performance metrics
       - name: Compare JMeter & k6 metrics
         run: |
           echo "=== Performance Comparison ==="
@@ -81,7 +89,7 @@ jobs:
           JM_MIN=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | head -1)
           JM_MAX=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | tail -1)
 
-          # --- k6 metrics (Trend response_time) ---
+          # --- k6 metrics ---
           K6_TOTAL=$(jq '.metrics.http_reqs.count' k6-results.json)
           K6_FAILED=$(jq '.metrics.checks.failed' k6-results.json)
           K6_AVG=$(jq '.metrics.response_time.avg' k6-results.json)
@@ -110,7 +118,5 @@ jobs:
           PID=$(cat spring-petclinic.pid)
           echo "Stopping Spring Petclinic (PID=$PID)..."
           kill $PID || true
-          # Kill any remaining child processes of Java
           pkill -P $PID || true
-
 

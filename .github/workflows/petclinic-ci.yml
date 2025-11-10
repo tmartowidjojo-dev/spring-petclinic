@@ -64,7 +64,7 @@ jobs:
           
           echo "Spring Petclinic is fully up and functional!"
           
-      # 6️ Install Performance Tools (FIXED: Voegt JMeter toe aan PATH)
+      # 6️ Install Performance Tools (FIXED: Voegt JMeter toe aan PATH en ENV)
       - name: Install Performance Tools (JMeter, k6, jq)
         run: |
           # Installeer basis tools
@@ -78,8 +78,11 @@ jobs:
           curl -sS -L "https://archive.apache.org/dist/jmeter/binaries/$JMETER_DIR.zip" -o jmeter.zip
           unzip -q jmeter.zip
           
-          #  FIX: Voeg de JMeter 'bin' directory toe aan het JOB's PATH voor alle volgende stappen 🌟
+          #  FIX 1: Voeg de JMeter 'bin' directory toe aan het JOB's PATH 
           echo "$PWD/$JMETER_DIR/bin" >> $GITHUB_PATH
+          
+          #  FIX 2: Exporteer het absolute pad naar een ENV-variabele voor expliciete aanroepen 
+          echo "JMETER_BIN_PATH=$PWD/$JMETER_DIR/bin" >> $GITHUB_ENV
           
           # --- k6 INSTALLATIE ---
           # Installeer k6
@@ -88,20 +91,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y k6
           
-          # Controleer de versies (zou nu moeten werken)
+          # Controleer de versies
           jmeter --version
           k6 version
           jq --version
           
-      # 7️ Run Tests and Extract Metrics (Nu met werkend JMeter pad)
+      # 7️ Run Tests and Extract Metrics (Nu met Explicit Path en Debugging)
       - name: Run Tests and Extract Metrics
         id: performance_test
         run: |
-          # De export PATH is nu niet meer nodig dankzij $GITHUB_PATH in stap 6
-          
-          echo "=== DEBUG: Checking Test Script Paths ==="
-          ls -F performance-tests/ || echo "WARNING: 'performance-tests/' directory not found or inaccessible. Test will likely fail."
-          echo "========================================="
+          # --- DEBUGGING: Controleer de environment variabelen ---
+          echo "DEBUG: Huidig PATH (moet JMeter pad bevatten): $PATH"
+          echo "DEBUG: JMeter Explicit Path (van GITHUB_ENV): $JMETER_BIN_PATH"
+          echo "========================================================="
           
           # Initialiseer alle variabelen als 0
           JM_TOTAL=0; JM_FAILED=0; JM_AVG=0; JM_MIN=0; JM_MAX=0
@@ -109,7 +111,8 @@ jobs:
           
           # --- RUN JMeter TEST ---
           echo "=== Running JMeter Test ==="
-          jmeter -n -t performance-tests/petclinic-jmeter-test.jmx -l jmeter-results.jtl -j jmeter.log -LINFO 
+          # Gebruik de expliciete pad-variabele voor gegarandeerd succes
+          "$JMETER_BIN_PATH/jmeter" -n -t performance-tests/petclinic-jmeter-test.jmx -l jmeter-results.jtl -j jmeter.log -LINFO 
           
           JMET_EXIT_CODE=$?
           

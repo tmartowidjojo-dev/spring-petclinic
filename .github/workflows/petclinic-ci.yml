@@ -33,14 +33,38 @@ jobs:
       # 5️ Start Spring Petclinic in the background
       - name: Start Spring Petclinic
         run: |
-          # The artifact will be named 'target/*.jar'
-          nohup java -jar target/*.jar > app.log 2>&1 &
+          # Find the built JAR file, assume it's the only one
+          APP_JAR=$(find target -name "*.jar" -type f | head -n 1)
+          
+          if [ -z "$APP_JAR" ]; then
+            echo "FATAL ERROR: Application JAR not found in target/."
+            exit 1
+          fi
+          
+          echo "Starting Spring Petclinic: $APP_JAR"
+          # Start app, redirecting stdout/stderr
+          nohup java -jar "$APP_JAR" > app.log 2>&1 &
           echo $! > spring-petclinic.pid
-          echo "Waiting for Spring Petclinic to be ready..."
-          until curl -s http://localhost:8080/actuator/health | grep -q '"status":"UP"'; do
+          
+          # --- IMPROVED READINESS CHECK ---
+          # Wait for the application's actual business endpoint (e.g., /owners) to be ready
+          echo "Waiting for Spring Petclinic to be fully ready on http://localhost:8080/owners"
+          MAX_RETRIES=12  # Wait for up to 60 seconds (12 * 5s)
+          RETRY_COUNT=0
+          
+          until curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/owners | grep -q '200'; do
+            if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+              echo "FATAL ERROR: Spring Petclinic failed to start within 60 seconds."
+              cat app.log
+              kill $(cat spring-petclinic.pid) || true
+              exit 1
+            fi
+            echo "App not ready (Status: $(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/owners)). Retrying in 5 seconds..."
             sleep 5
+            RETRY_COUNT=$((RETRY_COUNT + 1))
           done
-          echo "Spring Petclinic is up!"
+          
+          echo "Spring Petclinic is fully up and functional!"
 
       # 6️ Install Performance Tools (Gecombineerd JMeter, k6 & jq)
       - name: Install Performance Tools (JMeter, k6, jq)
@@ -62,14 +86,22 @@ jobs:
       # 7️ Run Tests and Compare Metrics (Defensieve checks toegevoegd + DEBUGGING)
       - name: Run Tests and Compare Metrics
         run: |
-          echo "===  Running JMeter Test ==="
+          echo "=== DEBUG: Checking Test Script Paths ==="
+          # List the contents of the directory where the performance scripts are expected
+          ls -F performance-tests/ || echo "WARNING: 'performance-tests/' directory not found or inaccessible. Test will likely fail."
+          echo "========================================="
+          
+          echo "=== Running JMeter Test ==="
           
           # DEBUG: Gebruik de -j optie om een JMeter log file te genereren
-          jmeter -n -t performance-tests/petclinic-jmeter-test.jmx -l jmeter-results.jtl -j jmeter.log -LDEBUG
+          # The execution will fail here if the .jmx file is missing, but JMeter will print an error to the log
+          jmeter -n -t performance-tests/petclinic-jmeter-test.jmx -l jmeter-results.jtl -j jmeter.log -LINFO 
           
-          # Controleer de exit code van de JMeter-opdracht 
-          if [ $? -ne 0 ]; then
-            echo "FATAL ERROR: JMeter test run failed with a non-zero exit code. Bekijk jmeter.log voor details."
+          JMET_EXIT_CODE=$?
+          
+          # Check for a non-zero exit code from JMeter
+          if [ $JMET_EXIT_CODE -ne 0 ]; then
+            echo "FATAL ERROR: JMeter test run failed with exit code $JMET_EXIT_CODE. Review jmeter.log for details."
           fi
 
           # Controleer of het resultatenbestand daadwerkelijk bestaat 
@@ -81,8 +113,9 @@ jobs:
             JM_MIN=0
             JM_MAX=0
           else
-            # Functionele fouten controle (wordt alleen uitgevoerd als het bestand bestaat)
-            JM_ERRORS=$(grep -c 'false' jmeter-results.jtl || echo 0)
+            # Check functional errors from the results file
+            # The JMeter JTL format uses 's="false"' for failures
+            JM_ERRORS=$(grep -c 's="false"' jmeter-results.jtl || echo 0)
             
             if [ "$JM_ERRORS" -gt 0 ]; then
               echo "JMeter test failed with $JM_ERRORS functional errors."
@@ -92,26 +125,39 @@ jobs:
             # --- JMeter metrics (Alleen parsen als het bestand bestaat) ---
             JM_TOTAL=$(grep -c '<httpSample' jmeter-results.jtl)
             JM_FAILED=$JM_ERRORS
-            JM_AVG=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | awk '{sum+=$1; count++} END {print count ? sum/count : 0}')
-            JM_MIN=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | head -1)
-            JM_MAX=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | tail -1)
+            # Extract response time (t) and calculate metrics
+            JM_AVG=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | awk '{sum+=$1; count++} END {print count ? int(sum/count) : 0}')
+            JM_MIN=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | head -1 || echo 0)
+            JM_MAX=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | tail -1 || echo 0)
           fi
           
-          echo "===  Running k6 Test ==="
+          echo "=== Running k6 Test ==="
+          # k6 runs and creates k6-results.json regardless of internal checks
           k6 run performance-tests/petclinic-load-test.js --out json=k6-results.json
 
           echo "=== Performance Comparison ==="
           
-          # --- k6 metrics (GECORRIGEERD: Vereenvoudigde jq syntax om shell error te voorkomen) ---
-          K6_TOTAL=$(jq '.metrics.http_reqs.count // 0' k6-results.json || echo 0)
-          K6_FAILED=$(jq '.metrics.checks.fails // 0' k6-results.json || echo 0)
-          
-          # Dit is de definitieve correctie: geen haakjes meer in de jq filter.
-          K6_AVG=$(jq '.metrics.http_req_duration.avg // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-          K6_MIN=$(jq '.metrics.http_req_duration.min // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-          K6_MAX=$(jq '.metrics.http_req_duration.max // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+          # --- k6 metrics (Using defensive defaults if file is missing) ---
+          if [ ! -f "k6-results.json" ]; then
+            echo "FATAL ERROR: k6-results.json file was NOT created. De k6 test is mislukt."
+            K6_TOTAL=0
+            K6_FAILED=0
+            K6_AVG=0
+            K6_MIN=0
+            K6_MAX=0
+          else
+            # K6 metrics extraction from JSON
+            K6_TOTAL=$(jq '.metrics.http_reqs.count // 0' k6-results.json || echo 0)
+            # checks.fail is an object, typically checks.fails.count
+            K6_FAILED=$(jq '.metrics.checks.fails.count // 0' k6-results.json || echo 0)
+            
+            # Convert k6 results (seconds) to milliseconds and truncate (cut -d'.' -f1)
+            K6_AVG=$(jq '.metrics.http_req_duration.avg // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+            K6_MIN=$(jq '.metrics.http_req_duration.min // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+            K6_MAX=$(jq '.metrics.http_req_duration.max // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+          fi
 
-          # --- Print table ---
+          # --- Print table (Quoted column headers for shell compatibility) ---
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" Tool Total Failed "Avg(ms)" "Min(ms)" "Max(ms)"
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" JMeter $JM_TOTAL $JM_FAILED $JM_AVG $JM_MIN $JM_MAX
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" k6 $K6_TOTAL $K6_FAILED $K6_AVG $K6_MIN $K6_MAX

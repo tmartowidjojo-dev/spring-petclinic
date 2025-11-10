@@ -58,15 +58,16 @@ jobs:
           fi
 
       # 8️ Install k6 & jq 
-      - name: Install k6 & jq
+      - name: Install k6
         run: |
-          sudo apt-get update
-          sudo apt-get install -y jq curl tar
-          K6_VERSION="0.113.0"
-          curl -sL https://github.com/grafana/k6/releases/download/v${K6_VERSION}/k6-v${K6_VERSION}-linux-amd64.tar.gz \
-            | tar -xz
-          sudo mv k6-v${K6_VERSION}-linux-amd64/k6 /usr/local/bin/k6
-          k6 version
+         sudo apt-get update
+         sudo apt-get install -y curl tar jq
+         # Download de officiële k6 Linux release (v0.113.0)
+         curl -sLo k6.tar.gz https://github.com/grafana/k6/releases/download/v0.113.0/k6-v0.113.0-linux-amd64.tar.gz
+         tar -xzf k6.tar.gz
+         sudo mv k6-v0.113.0-linux-amd64/k6 /usr/local/bin/
+         k6 version
+          
 
       # 9️ Run k6 Test (fails automatically if thresholds violated)
       - name: Run k6 Test

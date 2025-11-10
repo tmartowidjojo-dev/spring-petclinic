@@ -13,7 +13,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️ Set up Java
+      # 2️ Set up Java 25
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -33,6 +33,7 @@ jobs:
       # 5️ Start Spring Petclinic in the background
       - name: Start Spring Petclinic
         run: |
+          # The artifact will be named 'target/*.jar'
           nohup java -jar target/*.jar > app.log 2>&1 &
           echo $! > spring-petclinic.pid
           echo "Waiting for Spring Petclinic to be ready..."
@@ -41,7 +42,7 @@ jobs:
           done
           echo "Spring Petclinic is up!"
 
-      # 6️ Install JMeter
+      # 6️ Install JMeter (using apt)
       - name: Install JMeter
         run: |
           sudo apt-get update
@@ -51,53 +52,59 @@ jobs:
       - name: Run JMeter Test
         run: |
           jmeter -n -t performance-tests/petclinic-jmeter-test.jmx -l jmeter-results.jtl
-          ERRORS=$(grep -c 'false' jmeter-results.jtl || true)
+          ERRORS=$(grep -c 'false' jmeter-results.jtl || echo 0)
+          
           if [ "$ERRORS" -gt 0 ]; then
             echo "JMeter test failed with $ERRORS errors"
             exit 1
           fi
+          echo "JMeter test completed successfully."
 
-      # 8️ Install k6 & jq 
-      - name: Install k6
+      # 8️ Install k6 & jq (Reliable Install)
+      - name: Install k6 & jq (Reliable Install)
         run: |
-         sudo apt-get update
-         sudo apt-get install -y curl tar jq
-         # Download de officiële k6 Linux release (v0.113.0)
-         curl -sLo k6.tar.gz https://github.com/grafana/k6/releases/download/v0.113.0/k6-v0.113.0-linux-amd64.tar.gz
-         tar -xzf k6.tar.gz
-         sudo mv k6-v0.113.0-linux-amd64/k6 /usr/local/bin/
-         k6 version
+          # Install k6
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491E13833E9
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install k6
           
+          # Install jq (needed for metric comparison)
+          sudo apt-get install -y jq
+
+          k6 version
+          jq --version
 
       # 9️ Run k6 Test (fails automatically if thresholds violated)
       - name: Run k6 Test
         run: k6 run performance-tests/petclinic-load-test.js --out json=k6-results.json
 
-      # 10 Compare performance metrics (inclusief k6 responseTime Trend)
+      # 10 Compare performance metrics
       - name: Compare JMeter & k6 metrics
         run: |
           echo "=== Performance Comparison ==="
           
           # --- JMeter metrics ---
           JM_TOTAL=$(grep -c '<httpSample' jmeter-results.jtl)
-          JM_FAILED=$(grep -c 'false' jmeter-results.jtl || true)
+          JM_FAILED=$(grep -c 'false' jmeter-results.jtl || echo 0)
           JM_AVG=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | awk '{sum+=$1; count++} END {print count ? sum/count : 0}')
           JM_MIN=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | head -1)
           JM_MAX=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | tail -1)
 
           # --- k6 metrics ---
           K6_TOTAL=$(jq '.metrics.http_reqs.count' k6-results.json)
-          K6_FAILED=$(jq '.metrics.checks.failed' k6-results.json)
-          K6_AVG=$(jq '.metrics.response_time.avg' k6-results.json)
-          K6_MIN=$(jq '.metrics.response_time.min' k6-results.json)
-          K6_MAX=$(jq '.metrics.response_time.max' k6-results.json)
+          K6_FAILED=$(jq '.metrics.checks.fails' k6-results.json)
+          K6_AVG=$(jq '.metrics.http_req_duration.avg * 1000' k6-results.json | cut -d'.' -f1)
+          K6_MIN=$(jq '.metrics.http_req_duration.min * 1000' k6-results.json | cut -d'.' -f1)
+          K6_MAX=$(jq '.metrics.http_req_duration.max * 1000' k6-results.json | cut -d'.' -f1)
 
           # --- Print table ---
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" Tool Total Failed Avg(ms) Min(ms) Max(ms)
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" JMeter $JM_TOTAL $JM_FAILED $JM_AVG $JM_MIN $JM_MAX
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" k6 $K6_TOTAL $K6_FAILED $K6_AVG $K6_MIN $K6_MAX
 
-      # 1️1️ Upload performance artifacts
+      # 11 Upload performance artifacts
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -107,7 +114,7 @@ jobs:
             k6-results.json
             app.log
 
-      # 1️2️ Stop Spring Petclinic
+      # 12 Stop Spring Petclinic (Runs even if previous steps fail)
       - name: Stop Spring Petclinic
         if: always()
         run: |
@@ -115,4 +122,3 @@ jobs:
           echo "Stopping Spring Petclinic (PID=$PID)..."
           kill $PID || true
           pkill -P $PID || true
-

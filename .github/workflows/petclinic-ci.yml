@@ -72,14 +72,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y curl unzip jq
 
-          # --- JMeter 5.6.3 INSTALLATIE  ---
+          # --- JMeter 5.6.3 INSTALLATIE (Fix voor ForbiddenClassException) ---
           JMETER_VERSION="5.6.3"
           JMETER_DIR="apache-jmeter-$JMETER_VERSION"
           echo "Downloading Apache JMeter $JMETER_VERSION..."
           curl -sS -L "https://archive.apache.org/dist/jmeter/binaries/$JMETER_DIR.zip" -o jmeter.zip
           unzip -q jmeter.zip
-          # Zet de JMeter bin directory in het PATH
-          echo "$PWD/$JMETER_DIR/bin" >> $GITHUB_PATH
+          # Exporteer het pad naar de JMeter bin directory naar een ENV-variabele voor de volgende stappen
+          echo "JMETER_PATH=$PWD/$JMETER_DIR/bin" >> $GITHUB_ENV
           
           # --- k6 INSTALLATIE ---
           # Installeer k6
@@ -93,10 +93,13 @@ jobs:
           k6 version
           jq --version
 
-      # 7️ Run Tests and Extract Metrics 
+      # 7️ Run Tests and Extract Metrics (Slaat op in GITHUB_ENV)
       - name: Run Tests and Extract Metrics
         id: performance_test
         run: |
+          # Injecteer de JMeter path variabele in het PATH van deze stap
+          export PATH="$JMETER_PATH:$PATH"
+          
           echo "=== DEBUG: Checking Test Script Paths ==="
           ls -F performance-tests/ || echo "WARNING: 'performance-tests/' directory not found or inaccessible. Test will likely fail."
           echo "========================================="

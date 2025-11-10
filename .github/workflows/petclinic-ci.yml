@@ -67,7 +67,8 @@ jobs:
           
           echo "Spring Petclinic is fully up and functional!"
 
-      # 6️ Install k6 and jq (JMeter wordt nu via een Action geïnstalleerd)
+      # 6️ Install k6 and jq 
+      # Opmerking: Docker is standaard beschikbaar op ubuntu-latest.
       - name: Install k6 and jq
         run: |
           # Installeer k6 en jq
@@ -84,17 +85,18 @@ jobs:
           jq --version
 
       # 7️ Run JMeter and k6 Tests 
-      - name: Run JMeter Performance Test
-        # Gebruik de betrouwbare 'PerfRunner' actie als alternatief
-        uses: apoorva-D7/PerfRunner@v2 
-        with:
-          test_plan_path: performance-tests/petclinic-jmeter-test.jmx
-          # Output files (standaard: result.csv en jmeter.log)
-          result_file_path: jmeter-results.jtl
-          log_file_path: jmeter.log
-          # Pas hier de JMeter versie aan als nodig, standaard is de nieuwste
-          # jmeter_version: '5.6.3' 
-
+      - name: Run JMeter Performance Test (via Docker)
+        run: |
+          echo "Starting JMeter test using Docker..."
+          # Gebruik de justb4/jmeter Docker image, die een moderne JMeter-versie bevat.
+          # -v ${{ github.workspace }}:/app mount de gehele workspace naar /app in de container.
+          # We voeren JMeter uit binnen de container en slaan de output op /app, wat direct de host-workspace is.
+          docker run --rm -v ${{ github.workspace }}:/app justb4/jmeter:5.6.3 \
+            -n \
+            -t /app/performance-tests/petclinic-jmeter-test.jmx \
+            -l /app/jmeter-results.jtl \
+            -j /app/jmeter.log
+          
       - name: Run k6 Test
         run: |
           echo "=== Running k6 Test ==="

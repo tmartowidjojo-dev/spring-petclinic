@@ -84,14 +84,16 @@ jobs:
           jq --version
 
       # 7️ Run JMeter and k6 Tests 
-      - name: Run Performance Tests
-        # Installeer de nieuwste, stabiele JMeter-versie via een Action
-        # We gebruiken de stabiele major-versie (v5) om de foutmelding op te lossen.
-        uses: QAInsights/PerfAction@v5 
+      - name: Run JMeter Performance Test
+        # Gebruik de betrouwbare 'PerfRunner' actie als alternatief
+        uses: apoorva-D7/PerfRunner@v2 
         with:
-          test-plan-path: performance-tests/petclinic-jmeter-test.jmx
-          # De output files zijn jmeter-results.jtl en jmeter.log
-          args: '-l jmeter-results.jtl -j jmeter.log'
+          test_plan_path: performance-tests/petclinic-jmeter-test.jmx
+          # Output files (standaard: result.csv en jmeter.log)
+          result_file_path: jmeter-results.jtl
+          log_file_path: jmeter.log
+          # Pas hier de JMeter versie aan als nodig, standaard is de nieuwste
+          # jmeter_version: '5.6.3' 
 
       - name: Run k6 Test
         run: |

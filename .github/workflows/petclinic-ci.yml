@@ -112,7 +112,7 @@ jobs:
           K6_MAX=$(jq '.metrics.http_req_duration.max // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
 
           # --- Print table ---
-          printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" Tool Total Failed Avg(ms) Min(ms) Max(ms)
+          printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" Tool Total Failed "Avg(ms)" "Min(ms)" "Max(ms)"
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" JMeter $JM_TOTAL $JM_FAILED $JM_AVG $JM_MIN $JM_MAX
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" k6 $K6_TOTAL $K6_FAILED $K6_AVG $K6_MIN $K6_MAX
 

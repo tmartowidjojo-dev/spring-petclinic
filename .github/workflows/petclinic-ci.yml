@@ -59,7 +59,7 @@ jobs:
           k6 version
           jq --version
 
-      # 7️ Run Tests and Compare Metrics (Defensieve checks  + DEBUGGING)
+      # 7️ Run Tests and Compare Metrics (Defensieve checks toegevoegd + DEBUGGING)
       - name: Run Tests and Compare Metrics
         run: |
           echo "===  Running JMeter Test ==="
@@ -102,14 +102,14 @@ jobs:
 
           echo "=== Performance Comparison ==="
           
-          # --- k6 metrics (GECORRIGEERD: Gebruik // 0 om null-fouten te voorkomen) ---
-          K6_TOTAL=$(jq '(.metrics.http_reqs.count // 0)' k6-results.json || echo 0)
-          K6_FAILED=$(jq '(.metrics.checks.fails // 0)' k6-results.json || echo 0)
+          # --- k6 metrics (GECORRIGEERD: Vereenvoudigde jq syntax om shell error te voorkomen) ---
+          K6_TOTAL=$(jq '.metrics.http_reqs.count // 0' k6-results.json || echo 0)
+          K6_FAILED=$(jq '.metrics.checks.fails // 0' k6-results.json || echo 0)
           
-          # De avg/min/max metrics zijn in seconden, en kunnen null zijn.
-          K6_AVG=$(jq '((.metrics.http_req_duration.avg // 0) * 1000)' k6-results.json | cut -d'.' -f1 || echo 0)
-          K6_MIN=$(jq '((.metrics.http_req_duration.min // 0) * 1000)' k6-results.json | cut -d'.' -f1 || echo 0)
-          K6_MAX=$(jq '((.metrics.http_req_duration.max // 0) * 1000)' k6-results.json | cut -d'.' -f1 || echo 0)
+          # Let op: De buitenste haakjes zijn verwijderd in de jq-filter.
+          K6_AVG=$(jq '(.metrics.http_req_duration.avg // 0) * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+          K6_MIN=$(jq '(.metrics.http_req_duration.min // 0) * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+          K6_MAX=$(jq '(.metrics.http_req_duration.max // 0) * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
 
           # --- Print table ---
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" Tool Total Failed Avg(ms) Min(ms) Max(ms)
@@ -132,9 +132,6 @@ jobs:
         if: always()
         run: |
           PID=$(cat spring-petclinic.pid)
-          echo "Stopping Spring Petclinic (PID=$PID)..."
-          kill $PID || true
-          pkill -P $PID || true
           echo "Stopping Spring Petclinic (PID=$PID)..."
           kill $PID || true
           pkill -P $PID || true

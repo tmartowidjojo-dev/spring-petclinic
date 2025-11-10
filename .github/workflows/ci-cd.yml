@@ -60,18 +60,22 @@ jobs:
           fi
           echo "JMeter test completed successfully."
 
-      # 8️ Install k6 & jq (Reliable Install)
+      # 8️ Install k6 & jq
       - name: Install k6 & jq (Reliable Install)
         run: |
-          # Install k6
-          sudo gpg -k
-          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491E13833E9
-          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          # 1. Installeer curl, gnupg en jq
           sudo apt-get update
-          sudo apt-get install k6
-          
-          # Install jq (needed for metric comparison)
-          sudo apt-get install -y jq
+          sudo apt-get install -y curl gnupg jq
+
+          # 2. Download de GPG key direct via HTTPS en voeg deze toe aan keyrings
+          curl -fsSL https://dl.k6.io/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
+
+          # 3. Voeg de k6 repository toe aan de sources list
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list > /dev/null
+       
+          # 4. Installeer k6
+          sudo apt-get update
+          sudo apt-get install -y k6
 
           k6 version
           jq --version
@@ -122,3 +126,4 @@ jobs:
           echo "Stopping Spring Petclinic (PID=$PID)..."
           kill $PID || true
           pkill -P $PID || true
+

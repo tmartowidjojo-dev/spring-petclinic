@@ -59,35 +59,27 @@ jobs:
           k6 version
           jq --version
 
-      # 7️ Run Tests and Compare Metrics (Defensieve checks toegevoegd + DEBUGGING)
+      # 7️ Run Tests and Compare Metrics (Defensieve checks  + DEBUGGING)
       - name: Run Tests and Compare Metrics
         run: |
           echo "===  Running JMeter Test ==="
           
-          #  DEBUG: Gebruik de -j optie om een JMeter log file te genereren
-          # JMeter wordt uitgevoerd met de log level ingesteld op DEBUG voor maximale info.
+          # DEBUG: Gebruik de -j optie om een JMeter log file te genereren
           jmeter -n -t performance-tests/petclinic-jmeter-test.jmx -l jmeter-results.jtl -j jmeter.log -LDEBUG
           
           # Controleer de exit code van de JMeter-opdracht 
           if [ $? -ne 0 ]; then
             echo "FATAL ERROR: JMeter test run failed with a non-zero exit code. Bekijk jmeter.log voor details."
-            # We exit hier niet om de k6 test en artifact upload van de logs toe te staan
-            # Zodat je de logboeken kunt downloaden om het probleem te vinden.
           fi
 
           # Controleer of het resultatenbestand daadwerkelijk bestaat 
           if [ ! -f "jmeter-results.jtl" ]; then
             echo "FATAL ERROR: jmeter-results.jtl file was NOT created. De JMeter test is mislukt."
-            # We zetten JM_TOTAL, JM_FAILED, etc. op 0 of N/A om de rest van het script te laten draaien
-            # Omdat we weten dat het hier fout gaat, moeten we de shell variablen leeg laten om de grep error te omzeilen.
             JM_TOTAL=0
             JM_FAILED=0
             JM_AVG=0
             JM_MIN=0
             JM_MAX=0
-            
-            # Sla de rest van de JMeter logica over
-            SKIP_JMETERS_ANALYSE=true
           else
             # Functionele fouten controle (wordt alleen uitgevoerd als het bestand bestaat)
             JM_ERRORS=$(grep -c 'false' jmeter-results.jtl || echo 0)
@@ -110,13 +102,14 @@ jobs:
 
           echo "=== Performance Comparison ==="
           
-          # --- k6 metrics ---
-          # We gaan ervan uit dat k6-results.json wel is aangemaakt, anders faalt jq hier (wat een minder ernstig probleem is)
-          K6_TOTAL=$(jq '.metrics.http_reqs.count' k6-results.json || echo 0)
-          K6_FAILED=$(jq '.metrics.checks.fails' k6-results.json || echo 0)
-          K6_AVG=$(jq '.metrics.http_req_duration.avg * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-          K6_MIN=$(jq '.metrics.http_req_duration.min * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-          K6_MAX=$(jq '.metrics.http_req_duration.max * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+          # --- k6 metrics (GECORRIGEERD: Gebruik // 0 om null-fouten te voorkomen) ---
+          K6_TOTAL=$(jq '(.metrics.http_reqs.count // 0)' k6-results.json || echo 0)
+          K6_FAILED=$(jq '(.metrics.checks.fails // 0)' k6-results.json || echo 0)
+          
+          # De avg/min/max metrics zijn in seconden, en kunnen null zijn.
+          K6_AVG=$(jq '((.metrics.http_req_duration.avg // 0) * 1000)' k6-results.json | cut -d'.' -f1 || echo 0)
+          K6_MIN=$(jq '((.metrics.http_req_duration.min // 0) * 1000)' k6-results.json | cut -d'.' -f1 || echo 0)
+          K6_MAX=$(jq '((.metrics.http_req_duration.max // 0) * 1000)' k6-results.json | cut -d'.' -f1 || echo 0)
 
           # --- Print table ---
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" Tool Total Failed Avg(ms) Min(ms) Max(ms)
@@ -132,13 +125,16 @@ jobs:
             jmeter-results.jtl
             k6-results.json
             app.log
-            jmeter.log #  NIEUW: Voeg het JMeter logboek toe
+            jmeter.log 
 
       # 9️ Stop Spring Petclinic (Runs even if previous steps fail)
       - name: Stop Spring Petclinic
         if: always()
         run: |
           PID=$(cat spring-petclinic.pid)
+          echo "Stopping Spring Petclinic (PID=$PID)..."
+          kill $PID || true
+          pkill -P $PID || true
           echo "Stopping Spring Petclinic (PID=$PID)..."
           kill $PID || true
           pkill -P $PID || true

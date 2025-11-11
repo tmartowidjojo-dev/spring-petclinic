@@ -7,69 +7,69 @@ on:
     branches: [ main ]
 
 jobs:
-  build-and-test:
+  bouw-en-prestatie-test:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️ Checkout code
-      - name: Checkout code
+      # 1️ Code ophalen
+      - name: Code ophalen
         uses: actions/checkout@v4
 
-      # 2️ Set up Java 25
-      - name: Set up Java
+      # 2️ Java 25 instellen
+      - name: Java 25 instellen
         uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'
 
-      # 3️ Set up Maven
-      - name: Set up Maven
+      # 3️ Maven instellen
+      - name: Maven instellen
         uses: stCarolas/setup-maven@v4
         with:
           maven-version: '3.9.9'
 
-      # 4️ Build and run unit/integration tests
-      - name: Build and test
+      # 4️ Bouwen en eenheidstesten uitvoeren
+      - name: Bouwen en eenheidstesten uitvoeren
         run: mvn clean verify
 
-      # 5️ Start Spring Petclinic in the background
-      - name: Start Spring Petclinic
+      # 5️ Start Spring Petclinic op de achtergrond
+      - name: Start Spring Petclinic op de achtergrond
         run: |
-          # Find the built JAR file, assume it's the only one
+          # Zoek het gebouwde JAR-bestand, ga ervan uit dat het het enige is
           APP_JAR=$(find target -name "*.jar" -type f | head -n 1)
           
           if [ -z "$APP_JAR" ]; then
-            echo "FATAL ERROR: Application JAR not found in target/."
+            echo "FATALE FOUT: Applicatie JAR niet gevonden in target/."
             exit 1
           fi
           
-          echo "Starting Spring Petclinic: $APP_JAR"
-          # Start app, redirecting stdout/stderr
+          echo "Spring Petclinic starten: $APP_JAR"
+          # Start app, omleiden van stdout/stderr
           nohup java -jar "$APP_JAR" > app.log 2>&1 &
           echo $! > spring-petclinic.pid
           
-          # --- IMPROVED READINESS CHECK ---
-          echo "Waiting for Spring Petclinic to be fully ready on http://localhost:8080/owners"
-          MAX_RETRIES=12  # Wait for up to 60 seconds (12 * 5s)
+          # --- VERBETERDE GEREEDHEIDSCONTROLE ---
+          echo "Wachten tot Spring Petclinic volledig klaar is op http://localhost:8080/owners"
+          MAX_RETRIES=12  # Wacht maximaal 60 seconden (12 * 5s)
           RETRY_COUNT=0
           
           until curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/owners | grep -q '200'; do
             if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-              echo "FATAL ERROR: Spring Petclinic failed to start within 60 seconds."
+              echo "FATALE FOUT: Spring Petclinic is niet binnen 60 seconden gestart."
               cat app.log
               kill $(cat spring-petclinic.pid) || true
               exit 1
             fi
             # Use 't' to suppress transient failures from curl itself
-            echo "App not ready (Status: $(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/owners)). Retrying in 5 seconds..."
+            echo "App nog niet gereed (Status: $(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/owners")). Opnieuw proberen over 5 seconden..."
             sleep 5
             RETRY_COUNT=$((RETRY_COUNT + 1))
           done
           
-          echo "Spring Petclinic is fully up and functional!"
+          echo "Spring Petclinic is volledig operationeel!"
 
-      # 6️ Install k6 and jq  
-      - name: Install k6 and jq
+      # 6️ Installeer k6 en jq (gebruikt voor het parsen van k6-resultaten)
+      - name: Installeer k6 en jq
         run: |
           # Installeer k6 and jq
           sudo apt-get update
@@ -84,87 +84,50 @@ jobs:
           k6 version
           jq --version
 
-      # 7️ Run JMeter Performance Test  
-      - name: Run JMeter Performance Test (using Action)
-        uses: rbhadti94/apache-jmeter-action@v0.5.0
-        with:
-          testFilePath: 'performance-tests/petclinic-jmeter-test.jmx' # Pad naar uw JMX-bestand
-          outputReportsFolder: 'jmeter-reports' # Genereert een HTML-rapport in deze map
-          # Args zorgen ervoor dat de JTL en JMeter logfiles op dezelfde plaats komen als de oude Docker-stap.
-          args: '-l jmeter-results.jtl -j jmeter.log'
-          
-      # 7a Debug JMeter Failure
-      - name: Debug JMeter Failure
-        # Controleer of het resultatenbestand niet bestaat (als de test is gecrasht)
+      # 7️ k6 Prestatie Test uitvoeren
+      - name: k6 Prestatie Test uitvoeren
         run: |
-          if [ ! -f "jmeter-results.jtl" ]; then
-            echo "=========================================================="
-            echo "FATAL: JMeter Test Run FAILED - Printing jmeter.log below."
-            echo "=========================================================="
-            cat jmeter.log
-          fi
-
-      - name: Run k6 Test
-        run: |
-          echo "=== Running k6 Test ==="
-          # k6 runs and creates k6-results.json regardless of internal checks
+          echo "=== k6 Test uitvoeren ==="
+          # k6 draait en creëert k6-results.json
           k6 run performance-tests/petclinic-load-test.js --out json=k6-results.json
           
-      # 8️ Process Metrics and Compare
-      - name: Process Metrics and Compare
+      # 8️ Prestatie Metrieken Verwerken
+      - name: Prestatie Metrieken Verwerken
         run: |
-          echo "=== Performance Comparison ==="
+          echo "=== Prestatie Metrieken ==="
           
-          # --- JMeter metrics (JTL format) ---
-          if [ -f "jmeter-results.jtl" ]; then
-              # Parse JTL for basic metrics (simplified grep/awk logic)
-              JM_ERRORS=$(grep -c 's="false"' jmeter-results.jtl || echo 0)
-              JM_TOTAL=$(grep -c '<httpSample' jmeter-results.jtl)
-              JM_FAILED=$JM_ERRORS
-              JM_AVG=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | awk '{sum+=$1; count++} END {print count ? int(sum/count) : 0}')
-              JM_MIN=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | head -1 || echo 0)
-              JM_MAX=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | tail -1 || echo 0)
-          else
-              echo "FATAL ERROR: jmeter-results.jtl file was NOT created. De JMeter test is mislukt."
-              JM_TOTAL=0; JM_FAILED=0; JM_AVG=0; JM_MIN=0; JM_MAX=0
-          fi
-          
-          # --- k6 metrics (JSON format) ---
+          # --- k6 metrieken (JSON-formaat) ---
           if [ -f "k6-results.json" ]; then
               K6_TOTAL=$(jq '.metrics.http_reqs.count // 0' k6-results.json || echo 0)
               K6_FAILED=$(jq '.metrics.checks.fails.count // 0' k6-results.json || echo 0)
-              # Convert k6 results (seconds) to milliseconds and truncate (cut -d'.' -f1)
+              # Converteer k6-resultaten (seconden) naar milliseconden en truncate (cut -d'.' -f1)
               K6_AVG=$(jq '.metrics.http_req_duration.avg // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
               K6_MIN=$(jq '.metrics.http_req_duration.min // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
               K6_MAX=$(jq '.metrics.http_req_duration.max // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
           else
-              echo "FATAL ERROR: k6-results.json file was NOT created. De k6 test is mislukt."
+              echo "FATALE FOUT: k6-results.json bestand is NIET aangemaakt. De k6 test is mislukt."
               K6_TOTAL=0; K6_FAILED=0; K6_AVG=0; K6_MIN=0; K6_MAX=0
           fi
           
-          # --- Print table (CRUCIALE FIX: Quotes added for shell compatibility) ---
-          printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" Tool Total Failed "Avg(ms)" "Min(ms)" "Max(ms)"
+          # --- Tabel afdrukken ---
+          printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" Tool Totaal Mislukt "Gem(ms)" "Min(ms)" "Max(ms)"
           printf "-----------|------------|------------|------------|------------|------------\n"
-          printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" JMeter "$JM_TOTAL" "$JM_FAILED" "$JM_AVG" "$JM_MIN" "$JM_MAX" 
-          printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" k6 "$K6_TOTAL" "$K6_FAILED" "$K6_AVG" "$K6_MIN" "$K6_MAX" 
+          printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" k6 "$K6_TOTAL" "$K6_FAILED" "$K6_AVG" "$K6_MIN" "$K6_MAX"
 
-      # 9️ Upload performance artifacts
-      - name: Upload performance artifacts (JTL, k6, Reports)
+      # 9️ Prestatie bestanden uploaden (k6)
+      - name: Prestatie bestanden uploaden (k6)
         uses: actions/upload-artifact@v4
         with:
           name: performance-results
           path: |
-            jmeter-results.jtl
             k6-results.json
             app.log
-            jmeter.log
-            jmeter-reports # Voeg de HTML-rapporten toe
             
-      # 10️ Stop Spring Petclinic (Runs even if previous steps fail)
+      # 10️ Stop Spring Petclinic
       - name: Stop Spring Petclinic
         if: always()
         run: |
           PID=$(cat spring-petclinic.pid)
-          echo "Stopping Spring Petclinic (PID=$PID)..."
+          echo "Spring Petclinic stoppen (PID=$PID)..."
           kill $PID || true
           pkill -P $PID || true

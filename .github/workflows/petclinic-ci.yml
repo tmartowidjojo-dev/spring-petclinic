@@ -49,7 +49,6 @@ jobs:
           echo $! > spring-petclinic.pid
           
           # --- IMPROVED READINESS CHECK ---
-          # Wait for the application's actual business endpoint (e.g., /owners) to be ready
           echo "Waiting for Spring Petclinic to be fully ready on http://localhost:8080/owners"
           MAX_RETRIES=12  # Wait for up to 60 seconds (12 * 5s)
           RETRY_COUNT=0
@@ -62,7 +61,7 @@ jobs:
               exit 1
             fi
             # Use 't' to suppress transient failures from curl itself
-            echo "App not ready (Status: $(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/owners")). Retrying in 5 seconds..."
+            echo "App not ready (Status: $(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/owners)). Retrying in 5 seconds..."
             sleep 5
             RETRY_COUNT=$((RETRY_COUNT + 1))
           done
@@ -85,24 +84,26 @@ jobs:
           k6 version
           jq --version
 
-      # 7️ Run JMeter   
+      # 7️ Run JMeter Performance Test  
       - name: Run JMeter Performance Test (using Action)
         uses: rbhadti94/apache-jmeter-action@v0.5.0
         with:
-          testFilePath: 'performance-tests/petclinic-jmeter-test.jmx'
-          outputReportsFolder: 'jmeter-reports'
+          testFilePath: 'performance-tests/petclinic-jmeter-test.jmx' # Pad naar uw JMX-bestand
+          outputReportsFolder: 'jmeter-reports' # Genereert een HTML-rapport in deze map
+          # Args zorgen ervoor dat de JTL en JMeter logfiles op dezelfde plaats komen als de oude Docker-stap.
           args: '-l jmeter-results.jtl -j jmeter.log'
-      
-      # 7 Debug JMeter Execution Failure (CRUCIAL for analysis)
-      - name: Debug JMeter Execution Failure
-        #  jmeter-results.jtl niet bestaat 
-        if: ${{ !exists('jmeter-results.jtl') }}
-        run: |
-          echo "=========================================================="
-          echo "JMeter Test FAILED!"
-          echo "=========================================================="
-          cat jmeter.log
           
+      # 7a Debug JMeter Failure
+      - name: Debug JMeter Failure
+        # Controleer of het resultatenbestand niet bestaat (als de test is gecrasht)
+        run: |
+          if [ ! -f "jmeter-results.jtl" ]; then
+            echo "=========================================================="
+            echo "FATAL: JMeter Test Run FAILED - Printing jmeter.log below."
+            echo "=========================================================="
+            cat jmeter.log
+          fi
+
       - name: Run k6 Test
         run: |
           echo "=== Running k6 Test ==="
@@ -141,7 +142,7 @@ jobs:
               K6_TOTAL=0; K6_FAILED=0; K6_AVG=0; K6_MIN=0; K6_MAX=0
           fi
           
-          # --- Print table (Corrected Quoting) ---
+          # --- Print table (CRUCIALE FIX: Quotes added for shell compatibility) ---
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" Tool Total Failed "Avg(ms)" "Min(ms)" "Max(ms)"
           printf "-----------|------------|------------|------------|------------|------------\n"
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" JMeter "$JM_TOTAL" "$JM_FAILED" "$JM_AVG" "$JM_MIN" "$JM_MAX" 
@@ -157,7 +158,7 @@ jobs:
             k6-results.json
             app.log
             jmeter.log
-            jmeter-reports 
+            jmeter-reports # Voeg de HTML-rapporten toe
             
       # 10️ Stop Spring Petclinic (Runs even if previous steps fail)
       - name: Stop Spring Petclinic

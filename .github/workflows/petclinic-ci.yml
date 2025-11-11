@@ -88,7 +88,7 @@ jobs:
       # 7️ Run JMeter and k6 Tests  
       # NIEUWE STAP: Gebruikt de 'apache-jmeter-action' om de test uit te voeren.
       - name: Run JMeter Performance Test (using Action)
-        uses: rbhadti94/apache-jmeter-action@v0 
+        uses: rbhadti94/apache-jmeter-action@v0.5.0
         with:
           testFilePath: 'performance-tests/petclinic-jmeter-test.jmx' # Pad naar uw JMX-bestand
           outputReportsFolder: 'jmeter-reports' # Genereert een HTML-rapport in deze map

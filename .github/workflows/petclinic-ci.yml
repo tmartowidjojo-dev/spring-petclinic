@@ -1,77 +1,48 @@
 name: Spring Petclinic CI/CD (Java 25)
-
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
 jobs:
-  bouw-en-prestatie-test:
+  build-and-test:
     runs-on: ubuntu-latest
-
     steps:
-      # 1️ Code ophalen
-      - name: Code ophalen
+      # 1️ Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      # 2️ Java 25 instellen
-      - name: Java 25 instellen
+      
+      # 2️ Set up Java 25
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'
-
-      # 3️ Maven instellen
-      - name: Maven instellen
+          
+      # 3️ Set up Maven
+      - name: Set up Maven
         uses: stCarolas/setup-maven@v4
         with:
           maven-version: '3.9.9'
-
-      # 4️ Bouwen en eenheidstesten uitvoeren
-      - name: Bouwen en eenheidstesten uitvoeren
+          
+      # 4️ Build and run unit/integration tests
+      - name: Build and test
         run: mvn clean verify
-
-      # 5️ Start Spring Petclinic op de achtergrond
-      - name: Start Spring Petclinic op de achtergrond
+        
+      # 5️ Start Spring Petclinic in the background
+      - name: Start Spring Petclinic
         run: |
-          # Zoek het gebouwde JAR-bestand, ga ervan uit dat het het enige is
-          APP_JAR=$(find target -name "*.jar" -type f | head -n 1)
-          
-          if [ -z "$APP_JAR" ]; then
-            echo "FATALE FOUT: Applicatie JAR niet gevonden in target/."
-            exit 1
-          fi
-          
-          echo "Spring Petclinic starten: $APP_JAR"
-          # Start app, omleiden van stdout/stderr
-          nohup java -jar "$APP_JAR" > app.log 2>&1 &
+          # The artifact will be named 'target/*.jar'
+          nohup java -jar target/*.jar > app.log 2>&1 &
           echo $! > spring-petclinic.pid
-          
-          # --- VERBETERDE GEREEDHEIDSCONTROLE ---
-          echo "Wachten tot Spring Petclinic volledig klaar is op http://localhost:8080/owners"
-          MAX_RETRIES=12  # Wacht maximaal 60 seconden (12 * 5s)
-          RETRY_COUNT=0
-          
-          until curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/owners | grep -q '200'; do
-            if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
-              echo "FATALE FOUT: Spring Petclinic is niet binnen 60 seconden gestart."
-              cat app.log
-              kill $(cat spring-petclinic.pid) || true
-              exit 1
-            fi
-            # Use 't' to suppress transient failures from curl itself
-            echo "App nog niet gereed (Status: $(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/owners")). Opnieuw proberen over 5 seconden..."
+          echo "Waiting for Spring Petclinic to be ready..."
+          until curl -s http://localhost:8080/actuator/health | grep -q '"status":"UP"'; do
             sleep 5
-            RETRY_COUNT=$((RETRY_COUNT + 1))
           done
+          echo "Spring Petclinic is up!"
           
-          echo "Spring Petclinic is volledig operationeel!"
-
-      # 6️ Installeer k6 en jq (gebruikt voor het parsen van k6-resultaten)
-      - name: Installeer k6 en jq
+      # 6️ Install Performance Tools (k6 & jq)
+      - name: Install Performance Tools (k6, jq)
         run: |
-          # Installeer k6 and jq
+          # Installeer basis tools en jq
           sudo apt-get update
           sudo apt-get install -y curl gnupg jq
           
@@ -83,39 +54,29 @@ jobs:
           
           k6 version
           jq --version
-
-      # 7️ k6 Prestatie Test uitvoeren
-      - name: k6 Prestatie Test uitvoeren
+          
+      # 7️ Run k6 Test and Display Metrics 🚀
+      - name: Run k6 Test and Display Metrics
         run: |
-          echo "=== k6 Test uitvoeren ==="
-          # k6 draait en creëert k6-results.json
+          echo "=== Running k6 Performance Test ==="
           k6 run performance-tests/petclinic-load-test.js --out json=k6-results.json
+          echo "=== k6 Performance Metrics ==="
           
-      # 8️ Prestatie Metrieken Verwerken
-      - name: Prestatie Metrieken Verwerken
-        run: |
-          echo "=== Prestatie Metrieken ==="
+          # --- k6 metrics ---
+          K6_TOTAL=$(jq '.metrics.http_reqs.count // 0' k6-results.json || echo 0)
+          K6_FAILED=$(jq '.metrics.checks.fails // 0' k6-results.json || echo 0)
           
-          # --- k6 metrieken (JSON-formaat) ---
-          if [ -f "k6-results.json" ]; then
-              K6_TOTAL=$(jq '.metrics.http_reqs.count // 0' k6-results.json || echo 0)
-              K6_FAILED=$(jq '.metrics.checks.fails.count // 0' k6-results.json || echo 0)
-              # Converteer k6-resultaten (seconden) naar milliseconden en truncate (cut -d'.' -f1)
-              K6_AVG=$(jq '.metrics.http_req_duration.avg // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-              K6_MIN=$(jq '.metrics.http_req_duration.min // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-              K6_MAX=$(jq '.metrics.http_req_duration.max // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-          else
-              echo "FATALE FOUT: k6-results.json bestand is NIET aangemaakt. De k6 test is mislukt."
-              K6_TOTAL=0; K6_FAILED=0; K6_AVG=0; K6_MIN=0; K6_MAX=0
-          fi
+          # Conversie van seconden naar milliseconden en afronding naar geheel getal
+          K6_AVG=$(jq '.metrics.http_req_duration.avg // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+          K6_MIN=$(jq '.metrics.http_req_duration.min // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+          K6_MAX=$(jq '.metrics.http_req_duration.max // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
           
-          # --- Tabel afdrukken ---
-          printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" Tool Totaal Mislukt "Gem(ms)" "Min(ms)" "Max(ms)"
-          printf "-----------|------------|------------|------------|------------|------------\n"
-          printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" k6 "$K6_TOTAL" "$K6_FAILED" "$K6_AVG" "$K6_MIN" "$K6_MAX"
-
-      # 9️ Prestatie bestanden uploaden (k6)
-      - name: Prestatie bestanden uploaden (k6)
+          # --- Print table ---
+          printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" Tool Total Failed "Avg(ms)" "Min(ms)" "Max(ms)"
+          printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" k6 $K6_TOTAL $K6_FAILED $K6_AVG $K6_MIN $K6_MAX
+          
+      # 8️ Upload performance artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: performance-results
@@ -123,11 +84,11 @@ jobs:
             k6-results.json
             app.log
             
-      # 10️ Stop Spring Petclinic
+      # 9️ Stop Spring Petclinic (Runs even if previous steps fail)
       - name: Stop Spring Petclinic
         if: always()
         run: |
           PID=$(cat spring-petclinic.pid)
-          echo "Spring Petclinic stoppen (PID=$PID)..."
+          echo "Stopping Spring Petclinic (PID=$PID)..."
           kill $PID || true
           pkill -P $PID || true

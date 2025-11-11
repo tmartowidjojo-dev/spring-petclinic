@@ -3,6 +3,8 @@ name: Spring Petclinic CI/CD (Java 25)
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build-and-test:
@@ -67,11 +69,10 @@ jobs:
           
           echo "Spring Petclinic is fully up and functional!"
 
-      # 6️ Install k6 and jq 
-      # Opmerking: Docker is standaard beschikbaar op ubuntu-latest.
+      # 6️ Install k6 and jq  
       - name: Install k6 and jq
         run: |
-          # Installeer k6 en jq
+          # Installeer k6 and jq
           sudo apt-get update
           sudo apt-get install -y curl gnupg jq
           
@@ -84,18 +85,15 @@ jobs:
           k6 version
           jq --version
 
-      # 7️ Run JMeter and k6 Tests 
-      - name: Run JMeter Performance Test (via Docker)
-        run: |
-          echo "Starting JMeter test using Docker..."
-          # Gebruik de justb4/jmeter Docker image, die een moderne JMeter-versie bevat.
-          # -v ${{ github.workspace }}:/app mount de gehele workspace naar /app in de container.
-          # We voeren JMeter uit binnen de container en slaan de output op /app, wat direct de host-workspace is.
-          docker run --rm -v ${{ github.workspace }}:/app justb4/jmeter:5.6.3 \
-            -n \
-            -t /app/performance-tests/petclinic-jmeter-test.jmx \
-            -l /app/jmeter-results.jtl \
-            -j /app/jmeter.log
+      # 7️ Run JMeter and k6 Tests  
+      # NIEUWE STAP: Gebruikt de 'apache-jmeter-action' om de test uit te voeren.
+      - name: Run JMeter Performance Test (using Action)
+        uses: rbhadti94/apache-jmeter-action@v0 
+        with:
+          testFilePath: 'performance-tests/petclinic-jmeter-test.jmx' # Pad naar uw JMX-bestand
+          outputReportsFolder: 'jmeter-reports' # Genereert een HTML-rapport in deze map
+          # Args zorgen ervoor dat de JTL en JMeter logfiles op dezelfde plaats komen als de oude Docker-stap.
+          args: '-l jmeter-results.jtl -j jmeter.log'
           
       - name: Run k6 Test
         run: |
@@ -110,29 +108,29 @@ jobs:
           
           # --- JMeter metrics (JTL format) ---
           if [ -f "jmeter-results.jtl" ]; then
-             # Parse JTL for basic metrics (simplified grep/awk logic)
-             JM_ERRORS=$(grep -c 's="false"' jmeter-results.jtl || echo 0)
-             JM_TOTAL=$(grep -c '<httpSample' jmeter-results.jtl)
-             JM_FAILED=$JM_ERRORS
-             JM_AVG=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | awk '{sum+=$1; count++} END {print count ? int(sum/count) : 0}')
-             JM_MIN=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | head -1 || echo 0)
-             JM_MAX=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | tail -1 || echo 0)
+              # Parse JTL for basic metrics (simplified grep/awk logic)
+              JM_ERRORS=$(grep -c 's="false"' jmeter-results.jtl || echo 0)
+              JM_TOTAL=$(grep -c '<httpSample' jmeter-results.jtl)
+              JM_FAILED=$JM_ERRORS
+              JM_AVG=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | awk '{sum+=$1; count++} END {print count ? int(sum/count) : 0}')
+              JM_MIN=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | head -1 || echo 0)
+              JM_MAX=$(grep -oP ' t="\K[0-9]+' jmeter-results.jtl | sort -n | tail -1 || echo 0)
           else
-             echo "FATAL ERROR: jmeter-results.jtl file was NOT created. De JMeter test is mislukt."
-             JM_TOTAL=0; JM_FAILED=0; JM_AVG=0; JM_MIN=0; JM_MAX=0
+              echo "FATAL ERROR: jmeter-results.jtl file was NOT created. De JMeter test is mislukt."
+              JM_TOTAL=0; JM_FAILED=0; JM_AVG=0; JM_MIN=0; JM_MAX=0
           fi
           
           # --- k6 metrics (JSON format) ---
           if [ -f "k6-results.json" ]; then
-             K6_TOTAL=$(jq '.metrics.http_reqs.count // 0' k6-results.json || echo 0)
-             K6_FAILED=$(jq '.metrics.checks.fails.count // 0' k6-results.json || echo 0)
-             # Convert k6 results (seconds) to milliseconds and truncate (cut -d'.' -f1)
-             K6_AVG=$(jq '.metrics.http_req_duration.avg // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-             K6_MIN=$(jq '.metrics.http_req_duration.min // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-             K6_MAX=$(jq '.metrics.http_req_duration.max // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+              K6_TOTAL=$(jq '.metrics.http_reqs.count // 0' k6-results.json || echo 0)
+              K6_FAILED=$(jq '.metrics.checks.fails.count // 0' k6-results.json || echo 0)
+              # Convert k6 results (seconds) to milliseconds and truncate (cut -d'.' -f1)
+              K6_AVG=$(jq '.metrics.http_req_duration.avg // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+              K6_MIN=$(jq '.metrics.http_req_duration.min // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
+              K6_MAX=$(jq '.metrics.http_req_duration.max // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
           else
-             echo "FATAL ERROR: k6-results.json file was NOT created. De k6 test is mislukt."
-             K6_TOTAL=0; K6_FAILED=0; K6_AVG=0; K6_MIN=0; K6_MAX=0
+              echo "FATAL ERROR: k6-results.json file was NOT created. De k6 test is mislukt."
+              K6_TOTAL=0; K6_FAILED=0; K6_AVG=0; K6_MIN=0; K6_MAX=0
           fi
           
           # --- Print table (Quoted column headers for shell compatibility) ---
@@ -142,7 +140,7 @@ jobs:
           printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" k6 $K6_TOTAL $K6_FAILED $K6_AVG $K6_MIN $K6_MAX
 
       # 9️ Upload performance artifacts
-      - name: Upload artifacts
+      - name: Upload performance artifacts (JTL, k6, Reports)
         uses: actions/upload-artifact@v4
         with:
           name: performance-results
@@ -151,6 +149,7 @@ jobs:
             k6-results.json
             app.log
             jmeter.log
+            jmeter-reports # Voeg de HTML-rapporten toe
             
       # 10️ Stop Spring Petclinic (Runs even if previous steps fail)
       - name: Stop Spring Petclinic

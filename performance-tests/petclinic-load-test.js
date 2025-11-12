@@ -75,10 +75,10 @@ export default function () {
         let resPost = http.post(
             `${BASE_URL}/owners/new`,
             {
-                firstName: randomFirstName,
-                lastName: randomLastName,
-                address: '123 Test Street',
-                city: 'Test City',
+                firstName: zachary,
+                lastName:  lauer,
+                address: '123 coolStreet',
+                city: 'island City',
                 telephone: '5551234567',
             }
         );

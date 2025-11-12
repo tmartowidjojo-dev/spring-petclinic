@@ -38,6 +38,7 @@ jobs:
             sleep 5
           done
           echo "Spring Petclinic is up!"
+            sleep 5
           
       # 6️ Install Performance Tools (k6 & jq)
       - name: Install Performance Tools (k6, jq)

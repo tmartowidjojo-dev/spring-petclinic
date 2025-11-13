@@ -20,7 +20,7 @@ export let options = {
         'http_req_duration': ['p(95)<800'],
         
        
-        [`checks{${CRITICAL_CHECK_NAME}}`]: ['rate>0.99'], 
+    'checks{owner_creation_successful_302}': ['rate>0.99'], 
         
         // Specific thresholds for the flow duration (SLOs)
         'group_duration{group:01_Home Page}': ['p(95)<400'],

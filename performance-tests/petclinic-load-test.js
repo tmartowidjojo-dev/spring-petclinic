@@ -1,27 +1,28 @@
 import http from 'k6/http';
 import { check, sleep, group } from 'k6';
-import { html } from 'k6/html'; // <-- Noodzakelijk voor het parsen van de CSRF-token!
+import { html } from 'k6/html'; // Necessary for parsing the CSRF token
 
 const BASE_URL = 'http://localhost:8080';
 
-const CRITICAL_CHECK_NAME = 'owner creation successful (302)'; 
+
+const CRITICAL_CHECK_NAME = 'owner_creation_successful_302'; 
 
 export let options = {
-    // Definieer de belasting: 20 virtuele gebruikers voor 1 minuut
+    // Define the load profile
     vus: 20,         
     duration: '1m', 
 
     thresholds: {
-        // Algemene betrouwbaarheid: Max 1% van alle requests mag falen (4xx of 5xx status)
+        // General reliability: Max 1% of all requests may fail (4xx or 5xx status)
         'http_req_failed': ['rate<0.01'], 
         
-        // Algemene snelheid: 95% van alle requests moet binnen 800ms compleet zijn
+        // General speed: 95% of all requests must complete within 800ms
         'http_req_duration': ['p(95)<800'],
         
-        // De kritieke Owner Creation check moet minstens 99% succesvol zijn
+       
         [`checks{${CRITICAL_CHECK_NAME}}`]: ['rate>0.99'], 
         
-        // Specifieke drempels voor de doorlooptijd per flow (SLOs)
+        // Specific thresholds for the flow duration (SLOs)
         'group_duration{group:01_Home Page}': ['p(95)<400'],
         'group_duration{group:02_Owner Lookup Flow}': ['p(95)<1500'], 
         'group_duration{group:03_Veterinarians Page}': ['p(95)<500'],
@@ -36,7 +37,6 @@ export default function () {
         check(resHome, { 'home status 200': (r) => r.status === 200 });
         sleep(Math.random() * 0.5 + 1);
     });
-
 
 
     // 02 Find an Existing Owner & View Details (Search/Read Operation)
@@ -59,7 +59,6 @@ export default function () {
     });
     
 
-
     // 03 View List of Veterinarians (Read Operation)
     group('03_Veterinarians Page', function () {
         let resVets = http.get(`${BASE_URL}/vets`);
@@ -67,20 +66,19 @@ export default function () {
         sleep(Math.random() * 0.5 + 1);
     });
 
-
-    // 04 Add New Owner (Write Operation) 
+  
+    // 04 Add New Owner (Write Operation) - CSRF FIX IMPLEMENTED
     group('04_Add New Owner Flow', function () {
         // 1. GET: Haal het formulier op om de CSRF token te ontvangen
         let resForm = http.get(`${BASE_URL}/owners/new`);
         check(resForm, { 'add owner form status 200': (r) => r.status === 200 });
         
-      
-        // Parseer de HTML van de respons om de verborgen input met '_csrf' op te zoeken
+   
+     
         const doc = html.parse(resForm.body);
         const csrfToken = doc.find('input[name="_csrf"]').attr('value');
         
         if (!csrfToken) {
-            // Log de fout en keer terug om de iteratie te stoppen (voorkomt 403/400)
             console.error('Fout: CSRF-token niet gevonden. POST zal falen!');
             sleep(1);
             return;
@@ -92,7 +90,7 @@ export default function () {
         const randomFirstName = `LoadUser_${__VU}`;
         const randomLastName = `Test_${Math.random().toString(36).substring(2, 7)}`; 
         
-        // 3. POST: Stuur data inclusief token
+        // 3. POST: Stuur de data INCLUSIEF de token
         const postData = {
             firstName: randomFirstName,
             lastName: randomLastName,
@@ -117,7 +115,7 @@ export default function () {
             [CRITICAL_CHECK_NAME]: (r) => r.status === 302,
         });
         
-        // Log status als deze faalt voor directe debugging
+        // Log de daadwerkelijke status als deze faalt voor directe debugging
         if (resPost.status !== 302) {
              console.error(` POST Failed! Status: ${resPost.status}. Body Preview: ${resPost.body.substring(0, 100)}`);
         }

@@ -1,14 +1,15 @@
-️# Use a lightweight Java runtime
-FROM openjdk:25-jdk
 
-# Set the working directory inside  the container
+FROM eclipse-temurin:17-jdk-jammy
+
+# Set de working directory in de container
 WORKDIR /app
 
-#️ Copy your Maven build output (the JAR)
+# Kopieer je gebouwde JAR-bestand (vanuit Maven/Gradle target/)
+# Dit vereist dat je de applicatie eerst lokaal bouwt: ./gradlew build
 COPY target/*.jar app.jar
 
-# Expose the port Spring Boot runs on
+# De poort die Spring Boot gebruikt
 EXPOSE 8080
 
-# Run the application
+# Start de applicatie
 ENTRYPOINT ["java", "-jar", "app.jar"]

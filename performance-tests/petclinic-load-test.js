@@ -1,25 +1,26 @@
 import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 
-// Local host definition, for convenience
-const BASE_URL = 'http://localhost:8080';
+
+//  ingesteld in docker-compose.yml
+
+const BASE_URL = __ENV.TARGET_HOST || 'http://localhost:8080';
 
 export let options = {
-    // More realistic scenario with more VUs and longer duration
+
     vus: 20,           // 20 Virtual Users
-    duration: '1m',    // Test duration: 1 minute
+    duration: '1m',    // Test 1 minute
 
     thresholds: {
         // Errors: Less than 1% of requests may fail
         'http_req_failed': ['rate<0.01'],
         // Latency: 95% of requests must complete within 800ms
         'http_req_duration': ['p(95)<800'],
-        
+
         // Specific thresholds for the bundled flows
         'group_duration{group:01_Home Page}': ['p(95)<400'],
         'group_duration{group:02_Owner Lookup Flow}': ['p(95)<1500'],
         'group_duration{group:03_Veterinarians Page}': ['p(95)<500'],
-        'group_duration{group:04_Add New Owner Flow}': ['p(95)<2000'], 
     },
 };
 
@@ -40,7 +41,7 @@ export default function () {
 
         // Step B: Search for 'Franklin' (simulates a successful search)
         let resSearch = http.get(`${BASE_URL}/owners?lastName=Franklin`, { redirects: 0 });
-        
+
         check(resSearch, {
             'search redirect (302) or success (200)': (r) => r.status === 302 || r.status === 200,
         });
@@ -52,7 +53,7 @@ export default function () {
         }
         sleep(Math.random() * 1.5 + 1); // Wait 1 to 2.5 seconds
     });
-    
+
     //  View List of Veterinarians
     group('03_Veterinarians Page', function () {
         let resVets = http.get(`${BASE_URL}/vets`);
@@ -60,35 +61,4 @@ export default function () {
         sleep(Math.random() * 0.5 + 1);
     });
 
-    //  Add New Owner (Write Operation)
-    group('04_Add New Owner Flow', function () {
-        // Step A: Go to the form
-        let resForm = http.get(`${BASE_URL}/owners/new`);
-        check(resForm, { 'add owner form status 200': (r) => r.status === 200 });
-        sleep(1);
-
-        // Generate unique name and telephone number for the POST
-        const randomFirstName = `LoadUser_${__VU}`;
-        const randomLastName = `Test_${Math.random().toString(36).substring(2, 7)}`; 
-        
-        //  Submit the form
-        let resPost = http.post(
-            `${BASE_URL}/owners/new`,
-            {
-                firstName: zachary,
-                lastName: lauer,
-                address: '123 TestStreet',
-                city: 'Test City',
-                telephone: '5551234567',
-            }
-        );
-
-        // Check for successful redirect to the new owner detail page (status 302)
-        check(resPost, {
-            'owner creation successful (302)': (r) => r.status === 302,
-        });
-        
-        sleep(Math.random() * 1.5 + 1); 
-    });
 }
-

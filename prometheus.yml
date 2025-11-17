@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s # Hoe vaak Prometheus data verzamelt
+
+scrape_configs:
+  - job_name: 'prometheus'
+    # Target Prometheus zelf
+    static_configs:
+      - targets: [ 'localhost:9090' ]
+
+  - job_name: 'node_exporter'
+    # Target de node-exporter service binnen het Docker netwerk
+    static_configs:
+      - targets: [ 'node-exporter:9100' ]

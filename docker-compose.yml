@@ -54,7 +54,7 @@ services:
     networks:
       - default
 
-  # 4. CPU METRICS COLLECTOR (NU ZONDER FOUTIEVE COMMANDO'S)
+  # 4. CPU METRICS COLLECTOR
   node-exporter:
     image: prom/node-exporter:latest
     container_name: node-exporter
@@ -80,7 +80,7 @@ services:
     networks:
       - monitoring_net
 
-  # 6. VISUALISATIE (Dashboard)
+  # 6. VISUALISATIE
   grafana:
     image: grafana/grafana:latest
     container_name: grafana

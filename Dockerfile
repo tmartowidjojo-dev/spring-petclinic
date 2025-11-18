@@ -4,8 +4,8 @@ FROM eclipse-temurin:17-jdk-jammy
 # Set de working directory in de container
 WORKDIR /app
 
-# Kopieer je gebouwde JAR-bestand (vanuit Maven/Gradle target/)
-# Dit vereist dat je de applicatie eerst lokaal bouwt: ./gradlew build
+
+# Dit vereist dat je de applicatie eerst lokaal bouwt
 COPY target/*.jar app.jar
 
 # De poort die Spring Boot gebruikt

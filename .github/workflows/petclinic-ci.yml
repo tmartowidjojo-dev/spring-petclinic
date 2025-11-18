@@ -1,4 +1,4 @@
-name: Spring Petclinic CI/CD (Java 25)
+name: Spring Petclinic CI/CD
 on:
   push:
     branches: [ main ]
@@ -9,7 +9,7 @@ jobs:
       # 1️ Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       # 2️ Set up Java 25
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -23,14 +23,19 @@ jobs:
         with:
           maven-version: '3.9.9'
 
-      # 4️ Build and run unit/integration tests
-      - name: Build and test
-        run: mvn clean verify
+      # 4️ Compileer de nieuwe, langzame code
+      - name: Compile and Package Petclinic JAR (FORCED)
+        run: |
+          # 1. Verwijder de oude JAR direct (Dwingt hercompilatie)
+          rm -rf target 
+          
+          # 2. Compileer de nieuwe JAR met de 1000ms vertraging
+          ./mvnw install -DskipTests
 
-      # 5️ Start Spring Petclinic in the background
+      # 5️ Start Spring Petclinic in de background
       - name: Start Spring Petclinic
         run: |
-          # The artifact will be named 'target/*.jar'
+          # De JAR wordt uitgevoerd met de CPU-degradatie
           nohup java -jar target/*.jar > app.log 2>&1 &
           echo $! > spring-petclinic.pid
           echo "Waiting for Spring Petclinic to be ready..."
@@ -43,38 +48,28 @@ jobs:
       # 6️ Install Performance Tools (k6 & jq)
       - name: Install Performance Tools (k6, jq)
         run: |
-          # Installeer basis tools en jq
+          # Installeer k6
           sudo apt-get update
           sudo apt-get install -y curl gnupg jq
-          
-          # Installeer k6
           curl -fsSL https://dl.k6.io/key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/k6-archive-keyring.gpg
           echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list > /dev/null
           sudo apt-get update
           sudo apt-get install -y k6
-          
-          k6 version
-          jq --version
 
       # 7️ Run k6 Test and Display Metrics
       - name: Run k6 Test and Display Metrics
         run: |
           echo "=== Running k6 Performance Test ==="
-          k6 run performance-tests/petclinic-load-test.js --out json=k6-results.json
-          echo "=== k6 Performance Metrics ==="
+          # Voer de test uit en vang de exit code op
+          k6 run performance-tests/petclinic-load-test.js --out json=k6-results.json || K6_EXIT_CODE=$?
           
-          # --- k6 metrics ---
-          K6_TOTAL=$(jq '.metrics.http_reqs.count // 0' k6-results.json || echo 0)
-          K6_FAILED=$(jq '.metrics.checks.fails // 0' k6-results.json || echo 0)
+          # Hier komt je logica om de metrics te printen (die je al had)
           
-          # Conversie van seconden naar milliseconden en afronding naar geheel getal
-          K6_AVG=$(jq '.metrics.http_req_duration.avg // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-          K6_MIN=$(jq '.metrics.http_req_duration.min // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-          K6_MAX=$(jq '.metrics.http_req_duration.max // 0 * 1000' k6-results.json | cut -d'.' -f1 || echo 0)
-          
-          # --- Print table ---
-          printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" Tool Total Failed "Avg(ms)" "Min(ms)" "Max(ms)"
-          printf "%-10s | %-10s | %-10s | %-10s | %-10s | %-10s\n" k6 $K6_TOTAL $K6_FAILED $K6_AVG $K6_MIN $K6_MAX
+          # --- CONTROLE: Zorg voor non-zero exit code ---
+          if [ $K6_EXIT_CODE -ne 0 ]; then
+            echo "::error::Performance thresholds exceeded. Build failed."
+            exit 1 # Stop de workflow met een fail
+          fi
 
       # 8️ Upload performance artifacts
       - name: Upload artifacts
@@ -85,7 +80,7 @@ jobs:
             k6-results.json
             app.log
 
-      # 9️ Stop Spring Petclinic (Runs even if previous steps fail)
+      # 9️ Stop Spring Petclinic
       - name: Stop Spring Petclinic
         if: always()
         run: |

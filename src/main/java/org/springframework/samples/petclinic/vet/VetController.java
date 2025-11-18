@@ -43,13 +43,6 @@ class VetController {
 
 	@GetMapping("/vets.html")
 	public String showVetList(@RequestParam(defaultValue = "1") int page, Model model) {
-
-		long startTime = System.currentTimeMillis();
-		while (System.currentTimeMillis() - startTime < 1000) {
-			// Houd de CPU bezig met berekeningen om de 800ms threshold te breken
-			double dummy = Math.pow(Math.random(), Math.random());
-
-		}
 		// Here we are returning an object of type 'Vets' rather than a collection of Vet
 		// objects so it is simpler for Object-Xml mapping
 		Vets vets = new Vets();

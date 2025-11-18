@@ -2,13 +2,13 @@ import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 
 
-//  ingesteld in docker-compose.yml
+
 
 const BASE_URL = __ENV.TARGET_HOST || 'http://localhost:8080';
 
 export let options = {
 
-    vus: 20,           // 20 Virtual Users
+    vus: 200,           // 20 Virtual Users
     duration: '1m',    // Test 1 minute
 
     thresholds: {

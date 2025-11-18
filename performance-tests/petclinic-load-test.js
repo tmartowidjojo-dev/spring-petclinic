@@ -15,12 +15,12 @@ export let options = {
         // Errors: Less than 1% of requests may fail
         'http_req_failed': ['rate<0.01'],
         // Latency: 95% of requests must complete within 800ms
-        'http_req_duration': ['p(95)<800'],
+        'http_req_duration': ['p(95)<400'],
 
         // Specific thresholds for the bundled flows
         'group_duration{group:01_Home Page}': ['p(95)<400'],
-        'group_duration{group:02_Owner Lookup Flow}': ['p(95)<1500'],
-        'group_duration{group:03_Veterinarians Page}': ['p(95)<500'],
+        'group_duration{group:02_Owner Lookup Flow}': ['p(95)<500'],
+        'group_duration{group:03_Veterinarians Page}': ['p(95)400'],
     },
 };
 

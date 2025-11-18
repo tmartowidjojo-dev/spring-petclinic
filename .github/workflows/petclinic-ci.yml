@@ -10,29 +10,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️ Set up Java 25
+      # 2️ Set up Java 25 (De vereiste versie)
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'
 
-      # 3️ Set up Maven
+      # 3️ Set up Maven (blijft hetzelfde)
       - name: Set up Maven
         uses: stCarolas/setup-maven@v4
         with:
           maven-version: '3.9.9'
 
-      # Wis de target map (Garandeert schone build)
+      # NIEUWE STAP: Wis de target map (Garandeert schone build)
       - name: Clean Build Directory
         run: rm -rf target
 
-      # 4️ Compile and Package Petclinic JAR
-      # Dit compileert de nieuwe, langzame Java-code
+      # 4️ Compile and Package Petclinic JAR (ZONDER TESTS)
+      # Dit forceert een schone build en installeert de nieuwe, langzame code.
       - name: Compile and Package Petclinic JAR (Skips Tests)
         run: ./mvnw clean install -DskipTests
 
-      # 5️ Start Spring Petclinic in de achtergrond
+      # 5️ Start Spring Petclinic in de background
       - name: Start Spring Petclinic
         run: |
           # De JAR wordt uitgevoerd met de CPU-degradatie
@@ -57,6 +57,7 @@ jobs:
           sudo apt-get install -y k6
 
       # 7️ Run k6 Test and Display Metrics
+      # Deze stap zal nu de threshold breken door de ingebouwde vertraging.
       - name: Run k6 Test and Display Metrics
         run: |
           echo "=== Running k6 Performance Test ==="

@@ -20,7 +20,7 @@ export let options = {
         // Specific thresholds for the bundled flows
         'group_duration{group:01_Home Page}': ['p(95)<400'],
         'group_duration{group:02_Owner Lookup Flow}': ['p(95)<500'],
-        'group_duration{group:03_Veterinarians Page}': ['p(95)400'],
+        'group_duration{group:03_Veterinarians Page}': ['p(95)<400'],
     },
 };
 

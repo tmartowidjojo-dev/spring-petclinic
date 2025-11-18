@@ -23,11 +23,6 @@ export let options = {
     },
 };
 
-// Functie om cache uit te schakelen door een willekeurige parameter toe te voegen
-function addCacheBuster(url) {
-    return `${url}?t=${Date.now()}_${__VU}`;
-}
-
 export default function () {
     //  Home Page
     group('01_Home Page', function () {

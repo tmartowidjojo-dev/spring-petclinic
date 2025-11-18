@@ -1,28 +1,31 @@
-import http from 'k6/http'; .
+import http from 'k6/http';
 import { check, sleep, group } from 'k6';
+import { html } from 'k6/html';
 
+// ingesteld in docker-compose.yml
 const BASE_URL = 'http://petclinic:8080';
 
 export let options = {
 
-    vus: 200,           // 200 Virtual Users
-    duration: '1m',     // Test 1 minute
+
+    vus: 200,
+    duration: '1m',
 
     thresholds: {
         // Errors: Less than 1% of requests may fail
         'http_req_failed': ['rate<0.01'],
 
-        // Verlaag de drempel
+        // Verlaag de drempel agressief naar 150ms om de 1000ms vertraging te breken.
         'http_req_duration': ['p(95)<150'],
 
-        // Specific thresholds for de Veterinarians Page
+        // Groep 03 is de Vetten pagina
         'group_duration{group:01_Home Page}': ['p(95)<150'],
-        'group_duration{group:02_Owner Lookup Flow}': ['p(95)<500'],
+        'group_duration{group:02_Owner Lookup Flow}': ['p(95)<400'],
         'group_duration{group:03_Veterinarians Page}': ['p(95)<200'],
     },
 };
 
-// Cache BUSTER
+//  Cache BUSTER
 function addCacheBuster(url) {
     return `${url}?t=${Date.now()}_${__VU}`;
 }
@@ -32,7 +35,7 @@ export default function () {
     group('01_Home Page', function () {
         let resHome = http.get(addCacheBuster(`${BASE_URL}/`));
         check(resHome, { 'home status 200': (r) => r.status === 200 });
-        sleep(Math.random() * 0.5 + 1); // Wait 1 to 1.5 seconds
+        sleep(Math.random() * 0.5 + 1);
     });
 
     //  Find an Existing Owner & View Details
@@ -54,11 +57,12 @@ export default function () {
             let resDetail = http.get(addCacheBuster(`${BASE_URL}/owners/1`));
             check(resDetail, { 'detail page status 200': (r) => r.status === 200 });
         }
-        sleep(Math.random() * 1.5 + 1); // Wait 1 to 2.5 seconds
+        sleep(Math.random() * 1.5 + 1);
     });
 
     //  View List of Veterinarians
     group('03_Veterinarians Page', function () {
+        // Deze pagina bevat de 1000ms CPU-degradatie in de Java-code
         let resVets = http.get(addCacheBuster(`${BASE_URL}/vets`));
         check(resVets, { 'vets page status 200': (r) => r.status === 200 });
         sleep(Math.random() * 0.5 + 1);

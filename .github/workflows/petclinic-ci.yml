@@ -1,4 +1,4 @@
-name: Spring Petclinic CI/CD (Performance Gate)
+name: Spring Petclinic CI/CD
 on:
   push:
     branches: [ main ]
@@ -10,25 +10,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️ Set up Java 25 (De vereiste versie)
+      # 2️ Set up Java 25
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'
 
-      # 3️ Set up Maven (blijft hetzelfde)
+      # 3️ Set up Maven
       - name: Set up Maven
         uses: stCarolas/setup-maven@v4
         with:
           maven-version: '3.9.9'
 
-      # NIEUWE STAP: Wis de target map (Garandeert schone build)
+      #  Wis de target map
       - name: Clean Build Directory
         run: rm -rf target
 
-      # 4️ Compile and Package Petclinic JAR (ZONDER TESTS)
-      # Dit forceert een schone build en installeert de nieuwe, langzame code.
+      # 4️ Compile and Package Petclinic JAR
       - name: Compile and Package Petclinic JAR (Skips Tests)
         run: ./mvnw clean install -DskipTests
 
@@ -57,20 +56,18 @@ jobs:
           sudo apt-get install -y k6
 
       # 7️ Run k6 Test and Display Metrics
-      # Deze stap zal nu de threshold breken door de ingebouwde vertraging.
       - name: Run k6 Test and Display Metrics
         run: |
           echo "=== Running k6 Performance Test ==="
           # Voer de test uit en vang de exit code op
           k6 run performance-tests/petclinic-load-test.js --out json=k6-results.json || K6_EXIT_CODE=$?
           
-          echo "=== k6 Performance Metrics ==="
-          
-          # ... (Logica om metrics te printen is hier weggelaten voor de duidelijkheid) ...
+          # Haal metrics op voor de rapportage (dit moet je zelf implementeren met jq)
+          # Voor nu: we forceren de stop als de threshold faalt.
           
           # --- CONTROLE: Zorg voor non-zero exit code ---
           if [ $K6_EXIT_CODE -ne 0 ]; then
-            echo "::error::Performance thresholds exceeded (Avg: $K6_AVG ms). Build failed."
+            echo "::error::Performance thresholds exceeded. Build failed."
             exit 1 # Stop de workflow met een fail
           fi
 

@@ -23,6 +23,10 @@ jobs:
         with:
           maven-version: '3.9.9'
 
+      # Wis de target map (Garandeert schone build)
+      - name: Clean Build Directory
+        run: rm -rf target
+
       # 4️ Compile and Package Petclinic JAR
       # Dit compileert de nieuwe, langzame Java-code
       - name: Compile and Package Petclinic JAR (Skips Tests)

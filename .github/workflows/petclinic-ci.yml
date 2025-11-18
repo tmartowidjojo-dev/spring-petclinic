@@ -23,13 +23,15 @@ jobs:
         with:
           maven-version: '3.9.9'
 
-      #  Wis de target map
-      - name: Clean Build Directory
-        run: rm -rf target
-
-      # 4️ Compile and Package Petclinic JAR
-      - name: Compile and Package Petclinic JAR (Skips Tests)
-        run: ./mvnw clean install -DskipTests
+      # 4️ Dwingen Target Map Verwijderen en Compileer
+      # Dit is de meest agressieve stap om de cache te wissen en de nieuwe code te compilen.
+      - name: Compile and Package Petclinic JAR (FORCED)
+        run: |
+          # 1. Verwijder de oude JAR direct (dwingt een hercompilatie)
+          rm -rf target 
+          
+          # 2. Compileer de nieuwe JAR met de 1000ms vertraging
+          ./mvnw install -DskipTests
 
       # 5️ Start Spring Petclinic in de background
       - name: Start Spring Petclinic
@@ -63,7 +65,7 @@ jobs:
           k6 run performance-tests/petclinic-load-test.js --out json=k6-results.json || K6_EXIT_CODE=$?
           
           # Haal metrics op voor de rapportage (dit moet je zelf implementeren met jq)
-          # Voor nu: we forceren de stop als de threshold faalt.
+          # ... (Logica om metrics te printen is hier weggelaten) ...
           
           # --- CONTROLE: Zorg voor non-zero exit code ---
           if [ $K6_EXIT_CODE -ne 0 ]; then

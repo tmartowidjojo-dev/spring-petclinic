@@ -26,7 +26,7 @@ jobs:
       # 4️ Compile and Package Petclinic JAR
       # Dit compileert de nieuwe, langzame Java-code
       - name: Compile and Package Petclinic JAR (Skips Tests)
-        run: ./mvnw package -DskipTests
+        run: ./mvnw clean install -DskipTests
 
       # 5️ Start Spring Petclinic in de achtergrond
       - name: Start Spring Petclinic

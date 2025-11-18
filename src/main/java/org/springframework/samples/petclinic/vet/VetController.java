@@ -44,7 +44,7 @@ class VetController {
 	@GetMapping("/vets.html")
 	public String showVetList(@RequestParam(defaultValue = "1") int page, Model model) {
 		long startTime = System.currentTimeMillis();
-		while (System.currentTimeMillis() - startTime < 400) {
+		while (System.currentTimeMillis() - startTime < 1000) {
 			// Houd de CPU bezig met berekeningen om de 800ms threshold te breken
 			double dummy = Math.pow(Math.random(), Math.random());
 		}

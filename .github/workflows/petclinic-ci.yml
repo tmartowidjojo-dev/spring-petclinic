@@ -10,11 +10,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2️ Set up Java
+      # 2️ Set up Java 25
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '25'
           distribution: 'temurin'
 
       # 3️ Set up Maven
@@ -23,8 +23,8 @@ jobs:
         with:
           maven-version: '3.9.9'
 
-      # 4️ Build Petclinic JAR
-      #  langzame code (de CPU-lus) in de JAR te krijgen.
+      # 4️ Compile and Package Petclinic JAR
+      # Dit compileert de nieuwe, langzame Java-code
       - name: Compile and Package Petclinic JAR (Skips Tests)
         run: ./mvnw package -DskipTests
 
@@ -53,7 +53,6 @@ jobs:
           sudo apt-get install -y k6
 
       # 7️ Run k6 Test and Display Metrics
-
       - name: Run k6 Test and Display Metrics
         run: |
           echo "=== Running k6 Performance Test ==="
@@ -62,7 +61,7 @@ jobs:
           
           echo "=== k6 Performance Metrics ==="
           
-          # ... (Logica om metrics te printen) ...
+          # ... (Logica om metrics te printen is hier weggelaten voor de duidelijkheid) ...
           
           # --- CONTROLE: Zorg voor non-zero exit code ---
           if [ $K6_EXIT_CODE -ne 0 ]; then
@@ -79,7 +78,7 @@ jobs:
             k6-results.json
             app.log
 
-      # 9️ Stop Spring Petclinic (Runs even if previous steps fail)
+      # 9️ Stop Spring Petclinic
       - name: Stop Spring Petclinic
         if: always()
         run: |

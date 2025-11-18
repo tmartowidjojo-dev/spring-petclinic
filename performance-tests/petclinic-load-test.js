@@ -13,7 +13,7 @@ export let options = {
         // Errors: Less than 1% of requests may fail
         'http_req_failed': ['rate<0.01'],
 
-        // FIX: Latency - NU EXTREEM LAAG INGESTELD (100ms) om de 1000ms vertraging te breken
+        // FIX: Latency
         'http_req_duration': ['p(95)<100'],
 
         // Groep 03 bevat de 1000ms vertraging, dus deze moet falen

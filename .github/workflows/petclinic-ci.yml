@@ -1,4 +1,4 @@
-name: Spring Petclinic CI/CD (Performance Gate)
+name: Spring Petclinic CI/CD
 on:
   push:
     branches: [ main ]
@@ -25,7 +25,7 @@ jobs:
 
       # 4️ Compile and Package Petclinic JAR
 
-      - name: Compile and Package Petclinic JAR (FORCED)
+      - name: Compile and Package Petclinic JAR
         run: |
           # Wis de lokale Maven repository voor dit project 
           rm -rf ~/.m2/repository/org/springframework/samples/petclinic
@@ -38,7 +38,7 @@ jobs:
           # package: bouwt de JAR
           # -DskipTests: slaat de lange unittests over
           # -U: forceert update van snapshots
-          ./mvnw clean package -DskipTests -U
+          ./mvnw clean package -DskipTests -U 
 
       # 5️ Start Spring Petclinic in de background
       - name: Start Spring Petclinic

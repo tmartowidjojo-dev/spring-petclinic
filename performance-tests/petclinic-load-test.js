@@ -3,7 +3,7 @@ import { check, sleep, group } from 'k6';
 import { html } from 'k6/html';
 
 // ingesteld in docker-compose.yml
-const BASE_URL = 'http://localhost:8080';
+const BASE_URL = __ENV.TARGET_HOST || 'http://petclinic:8080';
 
 export let options = {
 
@@ -15,7 +15,7 @@ export let options = {
         // Errors: Less than 1% of requests may fail
         'http_req_failed': ['rate<0.01'],
 
-        // Verlaag de drempel agressief naar 150ms om de 1000ms vertraging te breken.
+        // Verlaag de drempel agressief naar 150ms om de vertraging te breken.
         'http_req_duration': ['p(95)<150'],
 
         // Groep 03 is de Vetten pagina

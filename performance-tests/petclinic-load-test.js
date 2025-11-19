@@ -3,7 +3,7 @@ import { check, sleep, group } from 'k6';
 import { html } from 'k6/html';
 
 // ingesteld in docker-compose.yml
-const BASE_URL = __ENV.TARGET_HOST || 'http://petclinic:8080';
+const BASE_URL = __ENV.TARGET_HOST || 'http://localhost:8080';
 
 export let options = {
 

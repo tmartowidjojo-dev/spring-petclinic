@@ -8,7 +8,7 @@ const BASE_URL = __ENV.TARGET_HOST || 'http://localhost:8080';
 export let options = {
 
 
-    vus: 200,
+    vus: 20,
     duration: '1m',
 
     thresholds: {

@@ -43,8 +43,12 @@ class VetController {
 
 	@GetMapping("/vets.html")
 	public String showVetList(@RequestParam(defaultValue = "1") int page, Model model) {
-		// Here we are returning an object of type 'Vets' rather than a collection of Vet
-		// objects so it is simpler for Object-Xml mapping
+		// Simuleer zwaar rekenwerk (bijv. crypto, beeldverwerking, slechte loop)
+		long endTime = System.currentTimeMillis() + 1000; // Draai 1 seconde lang
+		while (System.currentTimeMillis() < endTime) {
+			// Doelbewust CPU cycli verbranden (Busy Spin)
+			Math.tan(Math.atan(Math.tan(Math.atan(Math.random()))));
+		}
 		Vets vets = new Vets();
 		Page<Vet> paginated = findPaginated(page);
 		vets.getVetList().addAll(paginated.toList());

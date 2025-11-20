@@ -65,7 +65,7 @@ export default function () {
     //  View List of Veterinarians
     group('03_Veterinarians Page', function () {
         // Deze pagina bevat de CPU-degradatie in de Java-code
-        let resVets = http.get(addCacheBuster(`${BASE_URL}/vets`));
+        let resVets = http.get(addCacheBuster(`${BASE_URL}/vets.html`));
         check(resVets, { 'vets page status 200': (r) => r.status === 200 });
 
     });

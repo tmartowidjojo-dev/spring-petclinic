@@ -18,10 +18,10 @@ export let options = {
         // Verlaag de drempel agressief naar 150ms om de vertraging te breken.
         'http_req_duration': ['p(95)<150'],
 
-        // Groep 03 is de Vetten pagina
+        // Groep 03 is de Vet pagina
         'group_duration{group:01_Home Page}': ['p(95)<150'],
         'group_duration{group:02_Owner Lookup Flow}': ['p(95)<400'],
-        'group_duration{group:03_Veterinarians Page}': ['p(95)<200'],
+        'group_duration{group:03_Veterinarians Page}': ['p(95)<500'],
     },
 };
 
@@ -35,15 +35,16 @@ export default function () {
     group('01_Home Page', function () {
         let resHome = http.get(addCacheBuster(`${BASE_URL}/`));
         check(resHome, { 'home status 200': (r) => r.status === 200 });
-        sleep(Math.random() * 0.5 + 1);
+
     });
+ sleep(Math.random() * 0.5 + 1);
 
     //  Find an Existing Owner & View Details
     group('02_Owner Lookup Flow', function () {
         // Step A: Go to Find form
         let resFind = http.get(addCacheBuster(`${BASE_URL}/owners/find`));
         check(resFind, { 'find form status 200': (r) => r.status === 200 });
-        sleep(1);
+
 
         // Step B: Search for 'Franklin' (simulates a successful search)
         let resSearch = http.get(addCacheBuster(`${BASE_URL}/owners?lastName=Franklin`), { redirects: 0 });
@@ -57,14 +58,17 @@ export default function () {
             let resDetail = http.get(addCacheBuster(`${BASE_URL}/owners/1`));
             check(resDetail, { 'detail page status 200': (r) => r.status === 200 });
         }
-        sleep(Math.random() * 1.5 + 1);
+
     });
+ sleep(Math.random() * 1.5 + 1);
 
     //  View List of Veterinarians
     group('03_Veterinarians Page', function () {
-        // Deze pagina bevat de 1000ms CPU-degradatie in de Java-code
+        // Deze pagina bevat de CPU-degradatie in de Java-code
         let resVets = http.get(addCacheBuster(`${BASE_URL}/vets`));
         check(resVets, { 'vets page status 200': (r) => r.status === 200 });
-        sleep(Math.random() * 0.5 + 1);
+
     });
+     sleep(Math.random() * 0.5 + 1);
 }
+

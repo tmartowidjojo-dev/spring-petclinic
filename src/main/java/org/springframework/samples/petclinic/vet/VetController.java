@@ -73,4 +73,5 @@ class VetController {
 		vets.getVetList().addAll(this.vetRepository.findAll());
 		return vets;
 	}
+
 }

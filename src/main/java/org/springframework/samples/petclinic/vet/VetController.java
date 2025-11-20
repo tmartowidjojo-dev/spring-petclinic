@@ -44,16 +44,6 @@ class VetController {
 	@GetMapping("/vets.html")
 	public String showVetList(@RequestParam(defaultValue = "1") int page, Model model) {
 
-		long endTime = System.currentTimeMillis() + 1000;
-		double onzinResultaat = 0; // 1. Maak een variabele
-
-		while (System.currentTimeMillis() < endTime) {
-
-			onzinResultaat += Math.tan(Math.atan(Math.tan(Math.atan(Math.random()))));
-		}
-
-		System.out.println("Vertraging klaar, check getal: " + onzinResultaat);
-
 		Vets vets = new Vets();
 		Page<Vet> paginated = findPaginated(page);
 		vets.getVetList().addAll(paginated.toList());
@@ -83,5 +73,4 @@ class VetController {
 		vets.getVetList().addAll(this.vetRepository.findAll());
 		return vets;
 	}
-
 }

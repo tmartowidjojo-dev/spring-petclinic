@@ -7,7 +7,7 @@ const BASE_URL = __ENV.TARGET_HOST || 'http://localhost:8080';
 
 export let options = {
 
-    vus: 20,
+    vus: 200,
     duration: '1m',
 
     thresholds: {
@@ -69,4 +69,3 @@ export default function () {
     });
      sleep(Math.random() * 0.5 + 1);
 }
-

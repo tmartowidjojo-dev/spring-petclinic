@@ -63,23 +63,29 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list > /dev/null
           sudo apt-get update
           sudo apt-get install -y k6
-
-      # 7️ Run k6 Test and Display Metrics
-      - name: Run k6 Test and Display Metrics
-        run: |
-          echo "=== Running k6 Performance Test ==="
-          # Voer de test uit en vang de exit code op
-          k6 run performance-tests/petclinic-load-test.js --out json=k6-results.json || K6_EXIT_CODE=$?
           
-          # Metrics printen
-          K6_TOTAL=$(jq '.metrics.http_reqs.count // 0' k6-results.json || echo 0)
-          printf "K6 Total Requests: %s\n" "$K6_TOTAL"
           
-          # --- CONTROLE: Zorg voor non-zero exit code ---
-          if [ $K6_EXIT_CODE -ne 0 ]; then
-            echo "::error::Performance thresholds exceeded. Build failed."
-            exit 1 # Stop de workflow met een fail (ROOD KRUIS)
-          fi
+          # 7a. TEST 1: LOAD TEST 
+          - name:  1. Run Load Test
+            run: |
+              echo "=== Start Load Test (20 Users) ==="
+              k6 run performance-tests/petclinic-load-test.js --out json=load-results.json
+          
+          # 7b. TEST 2: STRESS TEST 
+          - name:2. Run Stress Test 
+            if: success()
+            continue-on-error: true
+            run: |
+              echo "=== Start Stress Test (200 Users) ==="
+              k6 run performance-tests/stress-test.js --out json=stress-results.json
+          
+          # 7c. TEST 3: BREAKPOINT TEST
+          - name: 3. Run Breakpoint Test (Ramping)
+            if: success() || failure()
+            continue-on-error: true
+            run: |
+              echo "=== Start Breakpoint Test ==="
+              k6 run performance-tests/breakpoint-test.js --out json=break-results.json
 
       # 8️ Upload performance artifacts
       - name: Upload artifacts
@@ -87,6 +93,8 @@ jobs:
         with:
           name: performance-results
           path: |
+            stress-results.json
+            break-results.json
             k6-results.json
             app.log
 

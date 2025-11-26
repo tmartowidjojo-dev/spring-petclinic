@@ -3,7 +3,7 @@ import { check, sleep, group } from 'k6';
 
 const BASE_URL = __ENV.TARGET_HOST || 'http://localhost:8080';
 
-const MAX_VUS = 175;
+const MAX_VUS = 180;
 const STEP_VUS = 10;
 const STEP_DURATION = '2s';
 

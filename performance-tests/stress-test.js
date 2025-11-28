@@ -31,7 +31,7 @@ export default function () {
         check(resHome, { 'home status 200': (r) => r.status === 200 });
     });
 
-    sleep(Math.random() * 0.2);
+    sleep(Math.random() * 0.5);
 
     // 02. Owner Lookup Flow
     group('02_Owner Lookup Flow', function () {
@@ -64,7 +64,7 @@ export default function () {
         }
     });
 
-   sleep(Math.random() * 0.2);
+   sleep(Math.random() * 0.5);
 
     // 03. Veterinarians Page
     group('03_Veterinarians Page', function () {
@@ -75,5 +75,5 @@ export default function () {
         check(resVets, { 'vets page status 200': (r) => r.status === 200 });
     });
 
-    sleep(Math.random() * 0.2);
+    sleep(Math.random() * 0.5);
 }

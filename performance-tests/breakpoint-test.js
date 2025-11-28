@@ -5,7 +5,7 @@ const BASE_URL = __ENV.TARGET_HOST || 'http://localhost:8080';
 
 const MAX_VUS = 190;
 const STEP_VUS = 10;
-const STEP_DURATION = '2s';
+const STEP_DURATION = '5';
 
 function generateStages() {
     let stages = [];
@@ -38,7 +38,7 @@ export default function () {
         });
         check(resHome, { 'home status 200': (r) => r.status === 200 });
     });
-    sleep(Math.random() * 0.2);
+    sleep(Math.random() * 0.5);
 
     // --- 02. Owner Lookup Flow ---
     group('02_Owner Lookup Flow', function () {
@@ -50,7 +50,6 @@ export default function () {
         check(resFind, { 'find form status 200': (r) => r.status === 200 });
 
         // Stap B: Zoeken
-
         let resSearch = http.get(addCacheBuster(`${BASE_URL}/owners?lastName=Franklin`), {
             redirects: 0,
             tags: { name: 'OwnerSearch' }
@@ -69,7 +68,7 @@ export default function () {
             check(resDetail, { 'detail page status 200': (r) => r.status === 200 });
         }
     });
-    sleep(Math.random() * 0.2);
+    sleep(Math.random() * 0.5);
 
     // --- 03. Veterinarians Page ---
     group('03_Veterinarians Page', function () {
@@ -78,5 +77,5 @@ export default function () {
         });
         check(resVets, { 'vets page status 200': (r) => r.status === 200 });
     });
-    sleep(Math.random() * 0.2);
+    sleep(Math.random() * 0.5 );
 }

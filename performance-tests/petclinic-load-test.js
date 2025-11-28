@@ -35,7 +35,7 @@ export default function () {
         let resHome = http.get(url, { tags: { name: 'Home Page' } });
         check(resHome, { 'home status 200': (r) => r.status === 200 });
     });
-    sleep(Math.random() * 0.2);
+    sleep(Math.random() * 2 + 1);
 
     // --- 02. Owner Lookup Flow ---
     group('02_Owner Lookup Flow', function () {
@@ -65,7 +65,7 @@ export default function () {
             check(resDetail, { 'detail page status 200': (r) => r.status === 200 });
         }
     });
-    sleep(Math.random() * 0.2);
+    sleep(Math.random() * 2 + 1);
 
     // --- 03. Veterinarians Page ---
     group('03_Veterinarians Page', function () {
@@ -74,5 +74,5 @@ export default function () {
         let resVets = http.get(urlVets, { tags: { name: 'Vets Page' } });
         check(resVets, { 'vets page status 200': (r) => r.status === 200 });
     });
-   sleep(Math.random() * 0.2);
+   sleep(Math.random() * 2 + 1);
 }

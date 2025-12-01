@@ -4,7 +4,7 @@ import { check, sleep, group } from 'k6';
 const BASE_URL = __ENV.TARGET_HOST || 'http://localhost:8080';
 
 export let options = {
-    vus: 200,
+    vus: 1000,
     duration: '1m',
     thresholds: {
         'http_req_failed': ['rate<0.01'],
@@ -31,7 +31,7 @@ export default function () {
         check(resHome, { 'home status 200': (r) => r.status === 200 });
     });
 
-    sleep(Math.random() * 0.5);
+    sleep(Math.random() * 2 + 1);
 
     // 02. Owner Lookup Flow
     group('02_Owner Lookup Flow', function () {
@@ -64,7 +64,7 @@ export default function () {
         }
     });
 
-   sleep(Math.random() * 0.5);
+   sleep(Math.random() * 2 + 1);
 
     // 03. Veterinarians Page
     group('03_Veterinarians Page', function () {
@@ -75,5 +75,5 @@ export default function () {
         check(resVets, { 'vets page status 200': (r) => r.status === 200 });
     });
 
-    sleep(Math.random() * 0.5);
+    sleep(Math.random() * 2 + 1);
 }

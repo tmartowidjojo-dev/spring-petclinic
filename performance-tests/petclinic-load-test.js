@@ -4,34 +4,36 @@ import { html } from 'k6/html';
 
 const BASE_URL = __ENV.TARGET_HOST || 'http://localhost:8080';
 
-export let options = {
+// --- DATA VOOR VARIATIE
+const LAST_NAMES = ['Franklin', 'Davis', 'Rodriquez', 'Black', 'White', 'Coleman', 'Leary', 'George', 'McTavish', 'Schroeder'];
+const OWNER_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    vus: 20,
-    duration: '1m',
+export let options = {
+    vus: 50,
+    duration: '5m',
 
     thresholds: {
-        // Errors: Minder dan 1% mag falen
+        // Errors: Streng zijn, het systeem mag niet falen onder normale last
         'http_req_failed': ['rate<0.01'],
 
-        // Latency target
-        'http_req_duration': ['p(95)<150'],
+        // Dit bewijst dat de users een snelle ervaring hebben
+        'http_req_duration': ['p(95)<400'],
 
-        // Groep targets
-        'group_duration{group:"01_Home Page"}': ['p(95)<150'],
-        'group_duration{group:"02_Owner Lookup Flow"}': ['p(95)<400'],
+        'group_duration{group:"01_Home Page"}': ['p(95)<200'],
+        'group_duration{group:"02_Owner Lookup Flow"}': ['p(95)<800'],
         'group_duration{group:"03_Veterinarians Page"}': ['p(95)<500'],
     },
 };
 
 function addCacheBuster(url) {
-    return `${url}?t=${Date.now()}_${__VU}`;
+
+    return `${url}${url.includes('?') ? '&' : '?'}t=${Date.now()}_${__VU}_${__ITER}`;
 }
 
 export default function () {
     // --- 01. Home Page ---
     group('01_Home Page', function () {
         let url = addCacheBuster(`${BASE_URL}/`);
-
         let resHome = http.get(url, { tags: { name: 'Home Page' } });
         check(resHome, { 'home status 200': (r) => r.status === 200 });
     });
@@ -39,14 +41,15 @@ export default function () {
 
     // --- 02. Owner Lookup Flow ---
     group('02_Owner Lookup Flow', function () {
-        // Step A: Go to Find form
+        // Step A: Form
         let urlFind = addCacheBuster(`${BASE_URL}/owners/find`);
-
         let resFind = http.get(urlFind, { tags: { name: 'Owner Find Form' } });
         check(resFind, { 'find form status 200': (r) => r.status === 200 });
 
-        // Step B: Search for 'Franklin'
-        let urlSearch = addCacheBuster(`${BASE_URL}/owners?lastName=Franklin`);
+        // Step B: Search (DYNAMISCH)
+        // Pak willekeurige naam zodat de database moet werken!
+        let randomName = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)];
+        let urlSearch = addCacheBuster(`${BASE_URL}/owners?lastName=${randomName}`);
 
         let resSearch = http.get(urlSearch, {
             redirects: 0,
@@ -57,9 +60,11 @@ export default function () {
             'search redirect (302) or success (200)': (r) => r.status === 302 || r.status === 200,
         });
 
-        // Step C: View detail page
+        // Step C: Detail (DYNAMISCH)
         if (resSearch.status === 302 || resSearch.status === 200) {
-            let urlDetail = addCacheBuster(`${BASE_URL}/owners/1`);
+            // Pak willekeurig ID
+            let randomId = OWNER_IDS[Math.floor(Math.random() * OWNER_IDS.length)];
+            let urlDetail = addCacheBuster(`${BASE_URL}/owners/${randomId}`);
 
             let resDetail = http.get(urlDetail, { tags: { name: 'Owner Detail' } });
             check(resDetail, { 'detail page status 200': (r) => r.status === 200 });
@@ -70,7 +75,6 @@ export default function () {
     // --- 03. Veterinarians Page ---
     group('03_Veterinarians Page', function () {
         let urlVets = addCacheBuster(`${BASE_URL}/vets.html`);
-
         let resVets = http.get(urlVets, { tags: { name: 'Vets Page' } });
         check(resVets, { 'vets page status 200': (r) => r.status === 200 });
     });

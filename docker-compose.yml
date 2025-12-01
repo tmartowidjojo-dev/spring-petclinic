@@ -38,6 +38,12 @@ services:
     networks:
       - default
 
+    deploy:
+       resources:
+            limits:
+              cpus: '1.0'
+              memory: 1G
+
   # 3. K6 RESULTATEN OPSLAG
   influxdb:
     image: influxdb:1.8

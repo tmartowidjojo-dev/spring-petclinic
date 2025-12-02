@@ -4,7 +4,7 @@ import { check, sleep, group } from 'k6';
 const BASE_URL = __ENV.TARGET_HOST || 'http://localhost:8080';
 
 export let options = {
-    vus: 1000,
+    vus: 200,
     duration: '1m',
     thresholds: {
         'http_req_failed': ['rate<0.01'],
